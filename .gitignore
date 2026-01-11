@@ -2,3 +2,6 @@ cache/
 vendor
 bin
 webdata/
+.env
+.env.production
+
