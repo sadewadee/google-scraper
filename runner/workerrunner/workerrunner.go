@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/gosom/google-maps-scraper/internal/worker"
-	"github.com/gosom/google-maps-scraper/runner"
+	"github.com/sadewadee/google-scraper/internal/worker"
+	"github.com/sadewadee/google-scraper/runner"
 )
 
 // Config holds configuration for the worker runner

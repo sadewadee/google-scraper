@@ -15,10 +15,10 @@ import (
 	"github.com/mattn/go-runewidth"
 	"golang.org/x/term"
 
-	"github.com/gosom/google-maps-scraper/s3uploader"
-	"github.com/gosom/google-maps-scraper/tlmt"
-	"github.com/gosom/google-maps-scraper/tlmt/gonoop"
-	"github.com/gosom/google-maps-scraper/tlmt/goposthog"
+	"github.com/sadewadee/google-scraper/s3uploader"
+	"github.com/sadewadee/google-scraper/tlmt"
+	"github.com/sadewadee/google-scraper/tlmt/gonoop"
+	"github.com/sadewadee/google-scraper/tlmt/goposthog"
 )
 
 const (
@@ -330,9 +330,9 @@ func banner(messages []string, width int) string {
 }
 
 func Banner() {
-	message1 := "🌍 Google Maps Scraper"
-	message2 := "⭐ If you find this project useful, please star it on GitHub: https://github.com/gosom/google-maps-scraper"
-	message3 := "💖 Consider sponsoring to support development: https://github.com/sponsors/gosom"
+	message1 := "🕷️  Scrapy Kremlit - Google Maps Scraper"
+	message2 := "🚀 Powered by Kremlit Dev Team"
+	message3 := fmt.Sprintf("v%s (%s)", Version, BuildDate)
 
 	fmt.Fprintln(os.Stderr, banner([]string{message1, message2, message3}, 0))
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/gosom/go-leadsdb"
 	"github.com/gosom/scrapemate"
 
-	"github.com/gosom/google-maps-scraper/gmaps"
+	"github.com/sadewadee/google-scraper/gmaps"
 )
 
 func New(apiKey string) scrapemate.ResultWriter {

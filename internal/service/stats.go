@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/gosom/google-maps-scraper/internal/domain"
+	"github.com/sadewadee/google-scraper/internal/domain"
 )
 
 // StatsService handles statistics aggregation

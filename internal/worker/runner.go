@@ -14,10 +14,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/gosom/google-maps-scraper/deduper"
-	"github.com/gosom/google-maps-scraper/exiter"
-	"github.com/gosom/google-maps-scraper/internal/domain"
-	"github.com/gosom/google-maps-scraper/runner"
+	"github.com/sadewadee/google-scraper/deduper"
+	"github.com/sadewadee/google-scraper/exiter"
+	"github.com/sadewadee/google-scraper/internal/domain"
+	"github.com/sadewadee/google-scraper/runner"
 	"github.com/gosom/scrapemate"
 	"github.com/gosom/scrapemate/adapters/writers/csvwriter"
 	"github.com/gosom/scrapemate/scrapemateapp"

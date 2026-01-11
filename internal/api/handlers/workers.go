@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/gosom/google-maps-scraper/internal/domain"
+	"github.com/sadewadee/google-scraper/internal/domain"
 )
 
 // WorkerServiceInterface defines the worker service methods

@@ -12,7 +12,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/gosom/google-maps-scraper/internal/domain"
+	"github.com/sadewadee/google-scraper/internal/domain"
 )
 
 // Client is a worker client that communicates with the manager API

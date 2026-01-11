@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 
-	"github.com/gosom/google-maps-scraper/internal/domain"
+	"github.com/sadewadee/google-scraper/internal/domain"
 )
 
 // JobRepository implements domain.JobRepository for PostgreSQL

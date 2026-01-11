@@ -11,8 +11,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/gosom/google-maps-scraper/gmaps"
-	"github.com/gosom/google-maps-scraper/internal/domain"
+	"github.com/sadewadee/google-scraper/gmaps"
+	"github.com/sadewadee/google-scraper/internal/domain"
 )
 
 // JobServiceInterface defines the job service methods

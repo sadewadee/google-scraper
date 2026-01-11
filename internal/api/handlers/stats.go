@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/gosom/google-maps-scraper/internal/domain"
+	"github.com/sadewadee/google-scraper/internal/domain"
 )
 
 // StatsServiceInterface defines the stats service methods

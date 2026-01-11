@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/gosom/google-maps-scraper/internal/domain"
+	"github.com/sadewadee/google-scraper/internal/domain"
 )
 
 // WorkerService defines methods needed for heartbeat monitoring

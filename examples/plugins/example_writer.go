@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/gosom/google-maps-scraper/gmaps"
+	"github.com/sadewadee/google-scraper/gmaps"
 	"github.com/gosom/scrapemate"
 )
 

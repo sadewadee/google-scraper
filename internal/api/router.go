@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"github.com/gosom/google-maps-scraper/internal/api/handlers"
+	"github.com/sadewadee/google-scraper/internal/api/handlers"
 )
 
 // Router sets up all API routes

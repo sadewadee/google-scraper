@@ -1,5 +1,11 @@
 APP_NAME := google_maps_scraper
 VERSION := 1.10.0
+COMMIT_HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BUILD_DATE := $(shell date +%Y-%m-%dT%H:%M:%S%z)
+LDFLAGS := -X 'github.com/gosom/google-maps-scraper/runner.Version=$(VERSION)' \
+           -X 'github.com/gosom/google-maps-scraper/runner.Commit=$(COMMIT_HASH)' \
+           -X 'github.com/gosom/google-maps-scraper/runner.BuildDate=$(BUILD_DATE)' \
+           -w -s
 
 # Database configuration (override with environment variables)
 POSTGRES_USER ?= gmaps
@@ -54,20 +60,20 @@ lint: ## runs the linter
 # ===========================================
 
 build: ## builds the application (default: playwright)
-	go build -o bin/$(APP_NAME) .
+	go build -ldflags "$(LDFLAGS)" -o bin/$(APP_NAME) .
 
 build-rod: ## builds the application with go-rod browser engine
-	go build -tags rod -o bin/$(APP_NAME)-rod .
+	go build -tags rod -ldflags "$(LDFLAGS)" -o bin/$(APP_NAME)-rod .
 
 cross-compile: ## cross compiles the application
-	GOOS=linux GOARCH=amd64 go build -o bin/$(APP_NAME)-${VERSION}-linux-amd64
-	GOOS=darwin GOARCH=amd64 go build -o bin/$(APP_NAME)-${VERSION}-darwin-amd64
-	GOOS=windows GOARCH=amd64 go build -o bin/$(APP_NAME)-${VERSION}-windows-amd64.exe
+	GOOS=linux GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o bin/$(APP_NAME)-${VERSION}-linux-amd64
+	GOOS=darwin GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o bin/$(APP_NAME)-${VERSION}-darwin-amd64
+	GOOS=windows GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o bin/$(APP_NAME)-${VERSION}-windows-amd64.exe
 
 cross-compile-rod: ## cross compiles the application with go-rod
-	GOOS=linux GOARCH=amd64 go build -tags rod -o bin/$(APP_NAME)-${VERSION}-rod-linux-amd64
-	GOOS=darwin GOARCH=amd64 go build -tags rod -o bin/$(APP_NAME)-${VERSION}-rod-darwin-amd64
-	GOOS=windows GOARCH=amd64 go build -tags rod -o bin/$(APP_NAME)-${VERSION}-rod-windows-amd64.exe
+	GOOS=linux GOARCH=amd64 go build -tags rod -ldflags "$(LDFLAGS)" -o bin/$(APP_NAME)-${VERSION}-rod-linux-amd64
+	GOOS=darwin GOARCH=amd64 go build -tags rod -ldflags "$(LDFLAGS)" -o bin/$(APP_NAME)-${VERSION}-rod-darwin-amd64
+	GOOS=windows GOARCH=amd64 go build -tags rod -ldflags "$(LDFLAGS)" -o bin/$(APP_NAME)-${VERSION}-rod-windows-amd64.exe
 
 # ===========================================
 # Docker

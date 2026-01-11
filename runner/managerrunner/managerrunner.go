@@ -15,14 +15,14 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
-	"github.com/gosom/google-maps-scraper/internal/api"
-	"github.com/gosom/google-maps-scraper/internal/api/handlers"
-	"github.com/gosom/google-maps-scraper/internal/domain"
-	"github.com/gosom/google-maps-scraper/internal/heartbeat"
-	"github.com/gosom/google-maps-scraper/internal/repository/postgres"
-	"github.com/gosom/google-maps-scraper/internal/repository/sqlite"
-	"github.com/gosom/google-maps-scraper/internal/service"
-	"github.com/gosom/google-maps-scraper/runner"
+	"github.com/sadewadee/google-scraper/internal/api"
+	"github.com/sadewadee/google-scraper/internal/api/handlers"
+	"github.com/sadewadee/google-scraper/internal/domain"
+	"github.com/sadewadee/google-scraper/internal/heartbeat"
+	"github.com/sadewadee/google-scraper/internal/repository/postgres"
+	"github.com/sadewadee/google-scraper/internal/repository/sqlite"
+	"github.com/sadewadee/google-scraper/internal/service"
+	"github.com/sadewadee/google-scraper/runner"
 	"golang.org/x/sync/errgroup"
 )
 

@@ -1,32 +1,31 @@
 # Build frontend
-FROM node:20-slim AS frontend-builder
+FROM node:22-slim AS frontend-builder
 WORKDIR /web
 COPY web/frontend/package.json web/frontend/package-lock.json ./
 # Create a dummy lock file if it doesn't exist to prevent install failure
-# The context is web/frontend, so we copy files there
 RUN if [ ! -f package-lock.json ]; then echo "{}" > package-lock.json; fi
 RUN npm install
 COPY web/frontend/ .
 RUN npm run build
 
 # Build stage
-FROM golang:1.25.5-trixie AS builder
+FROM golang:1.24-bookworm AS builder
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -tags rod -ldflags="-w -s" -o /usr/bin/google-maps-scraper
+RUN CGO_ENABLED=0 go build -tags rod -ldflags="-w -s" -o /usr/bin/gmaps-scraper
 
 # Download Chromium for rod during build using the browser download tool
 RUN go run github.com/go-rod/rod/lib/utils/get-browser@latest
 
 # Final stage - using Debian base with minimal Chromium dependencies
-FROM debian:trixie-slim
+FROM debian:bookworm-slim
 
 # Install only essential Chromium dependencies (combined in single layer, aggressive cleanup)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
-    libasound2t64 \
+    libasound2 \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
     libcairo2 \
@@ -52,8 +51,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && find /usr/share/man -type f -delete \
     && find /usr/share/locale -type f -delete
 
-COPY --from=builder /usr/bin/google-maps-scraper /usr/bin/
+COPY --from=builder /usr/bin/gmaps-scraper /usr/bin/
 COPY --from=builder /root/.cache/rod /root/.cache/rod
-COPY --from=frontend-builder /web/dist /usr/share/google-maps-scraper/static
+COPY --from=frontend-builder /web/dist /usr/share/gmaps-scraper/static
 
-ENTRYPOINT ["google-maps-scraper"]
+ENTRYPOINT ["gmaps-scraper"]
