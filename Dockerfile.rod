@@ -22,9 +22,10 @@ RUN go run github.com/go-rod/rod/lib/utils/get-browser@latest
 # Final stage - using Debian base with minimal Chromium dependencies
 FROM debian:bookworm-slim
 
-# Install only essential Chromium dependencies (combined in single layer, aggressive cleanup)
+# Install essential Chromium dependencies + curl for healthcheck
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
+    curl \
     libasound2 \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
