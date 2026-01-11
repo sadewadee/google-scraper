@@ -1,0 +1,27 @@
+import { api } from "./client"
+import type { Job, ApiResponse } from "./types"
+
+export const jobsApi = {
+    getAll: async (): Promise<ApiResponse<Job[]>> => {
+        const response = await api.get<ApiResponse<Job[]>>("/jobs")
+        return response.data
+    },
+
+    getOne: async (id: string): Promise<ApiResponse<Job>> => {
+        const response = await api.get<ApiResponse<Job>>(`/jobs/${id}`)
+        return response.data
+    },
+
+    create: async (data: Partial<Job>): Promise<ApiResponse<Job>> => {
+        const response = await api.post<ApiResponse<Job>>("/jobs", data)
+        return response.data
+    },
+
+    cancel: async (id: number): Promise<void> => {
+        await api.post(`/jobs/${id}/cancel`)
+    },
+
+    delete: async (id: number): Promise<void> => {
+        await api.delete(`/jobs/${id}`)
+    }
+}
