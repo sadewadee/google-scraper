@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -89,20 +90,25 @@ func Auth(token string) func(http.Handler) http.Handler {
 				return
 			}
 
+			// Check Authorization header
 			authHeader := r.Header.Get("Authorization")
 			if authHeader != "" {
 				parts := strings.Split(authHeader, " ")
-				if len(parts) == 2 && parts[0] == "Bearer" && parts[1] == token {
-					next.ServeHTTP(w, r)
-					return
+				if len(parts) == 2 && parts[0] == "Bearer" {
+					if subtle.ConstantTimeCompare([]byte(parts[1]), []byte(token)) == 1 {
+						next.ServeHTTP(w, r)
+						return
+					}
 				}
 			}
 
-			// Also check X-API-Key
+			// Check X-API-Key
 			apiKey := r.Header.Get("X-API-Key")
-			if apiKey == token {
-				next.ServeHTTP(w, r)
-				return
+			if apiKey != "" {
+				if subtle.ConstantTimeCompare([]byte(apiKey), []byte(token)) == 1 {
+					next.ServeHTTP(w, r)
+					return
+				}
 			}
 
 			renderError(w, http.StatusUnauthorized, "Unauthorized")

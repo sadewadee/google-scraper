@@ -123,6 +123,23 @@ docker compose run --rm scraper-web \
 
 ## Dokploy-Specific Settings
 
+### Custom Domain Setup (scrapy.kremlit.dev)
+
+#### 1. DNS Configuration
+Point your domain to the Dokploy server:
+```
+A    scrapy.kremlit.dev    →    <DOKPLOY_SERVER_IP>
+```
+
+#### 2. Dokploy Domain Settings
+1. In Dokploy Application settings → **Domains**
+2. Add domain: `scrapy.kremlit.dev`
+3. Enable **Auto HTTPS** (Let's Encrypt via Traefik)
+4. Map to service: `manager` (port 8080)
+
+#### 3. Traefik Labels (Managed by Dokploy)
+Dokploy automatically generates Traefik labels when you add a domain. You do **NOT** need to configure these manually.
+
 ### Health Check
 ```yaml
 # Sudah ada di docker-compose.yml
