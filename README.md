@@ -121,95 +121,69 @@ The scraper has [built-in LeadsDB integration](#export-to-leadsdb) - just add yo
 
 ## Quick Start
 
-### Web UI
+### Docker Compose (Recommended)
 
-Start the web interface with a single command:
-
-```bash
-mkdir -p gmapsdata && docker run -v $PWD/gmapsdata:/gmapsdata -p 8080:8080 gosom/google-maps-scraper -data-folder /gmapsdata
-```
-
-Then open http://localhost:8080 in your browser.
-
-Or download the [binary release](https://github.com/gosom/google-maps-scraper/releases) for your platform.
-
-> **Note:** Results take at least 3 minutes to appear (minimum configured runtime).
-> 
-> **macOS Users:** Docker command may not work. See [MacOS Instructions](MacOS%20instructions.md).
-
-### Command Line
+The easiest way to run the full stack (Manager + Worker + Database):
 
 ```bash
-touch results.csv && docker run \
-  -v $PWD/example-queries.txt:/example-queries \
-  -v $PWD/results.csv:/results.csv \
-  gosom/google-maps-scraper \
-  -depth 1 \
-  -input /example-queries \
-  -results /results.csv \
-  -exit-on-inactivity 3m
+# 1. Start the stack
+docker compose up -d
+
+# 2. Open Web UI
+open http://localhost:8080
 ```
 
-> **Tip:** Use `gosom/google-maps-scraper:latest-rod` for the Rod version with faster container startup.
+This starts:
+- **Manager**: Web UI & API (Port 8080)
+- **Worker**: Scraper instance (Auto-connected)
+- **Database**: PostgreSQL (Port 5432)
 
-**Want emails?** Add the `-email` flag.
+### Manual Run (No Docker)
 
-**Want all reviews (up to ~300)?** Add `--extra-reviews` and use `-json` output.
+You can run the manager with SQLite support directly:
 
-### REST API
+```bash
+# 1. Build
+go build -o gmaps
 
-When running the web server, a full REST API is available:
+# 2. Run Manager (uses local gmaps.db)
+./gmaps -manager
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/v1/jobs` | POST | Create a new scraping job |
-| `/api/v1/jobs` | GET | List all jobs |
-| `/api/v1/jobs/{id}` | GET | Get job details |
-| `/api/v1/jobs/{id}` | DELETE | Delete a job |
-| `/api/v1/jobs/{id}/download` | GET | Download results as CSV |
+# 3. Open Web UI
+open http://localhost:8080
 
-Full OpenAPI 3.0.3 documentation available at http://localhost:8080/api/docs
+# 4. Run Worker (in a separate terminal)
+./gmaps -worker -manager-url http://localhost:8080 -c 4
+```
 
 ---
 
-## Installation
+## Architecture
 
-### Using Docker (Recommended)
+This project uses a **Manager-Worker** architecture:
 
-Two Docker image variants are available:
+- **Manager**: Handles the Web UI, API, Job Queue, and Database interactions.
+- **Worker**: Fetches jobs from the Manager, performs scraping, and submits results back.
+- **Database**: PostgreSQL (Production) or SQLite (Single-node).
 
-| Image | Tag | Browser Engine | Best For |
-|-------|-----|----------------|----------|
-| Playwright (default) | `latest`, `vX.X.X` | Playwright | Most users, better stability |
-| Rod | `latest-rod`, `vX.X.X-rod` | Rod/Chromium | Lightweight, faster startup |
+### Authentication
 
-```bash
-# Playwright version (default)
-docker pull gosom/google-maps-scraper
-
-# Rod version (alternative)
-docker pull gosom/google-maps-scraper:latest-rod
-```
-
-### Build from Source
-
-Requirements: Go 1.25.5+
+Secure your API/UI by setting the `API_TOKEN` environment variable:
 
 ```bash
-git clone https://github.com/gosom/google-maps-scraper.git
-cd google-maps-scraper
-go mod download
-
-# Playwright version (default)
-go build
-./google-maps-scraper -input example-queries.txt -results results.csv -exit-on-inactivity 3m
-
-# Rod version (alternative)
-go build -tags rod
-./google-maps-scraper -input example-queries.txt -results results.csv -exit-on-inactivity 3m
+export API_TOKEN="your-secret-token"
+./gmaps -manager
 ```
 
-> First run downloads required browser libraries (Playwright or Chromium depending on version).
+Or in `docker-compose.yml`:
+
+```yaml
+manager:
+  environment:
+    - API_TOKEN=your-secret-token
+```
+
+When enabled, all API requests require `Authorization: Bearer <token>` or `X-API-Key: <token>`.
 
 ---
 
@@ -217,15 +191,11 @@ go build -tags rod
 
 | Feature | Description |
 |---------|-------------|
+| **ProxyGate** | Built-in proxy manager with auto-rotation and health checks |
+| **Microservices** | Scalable Worker nodes that can be distributed across machines |
+| **Modern UI** | Neumorphism design with Real-time Dashboard (React + Tailwind) |
+| **Dynamic Export** | Customizable CSV columns |
 | **33+ Data Points** | Business name, address, phone, website, reviews, coordinates, and more |
-| **Email Extraction** | Optional crawling of business websites for email addresses |
-| **Multiple Output Formats** | CSV, JSON, PostgreSQL, S3, LeadsDB, or custom plugins |
-| **Proxy Support** | SOCKS5, HTTP, HTTPS with authentication |
-| **Scalable Architecture** | Single machine to Kubernetes cluster |
-| **REST API** | Programmatic control for automation |
-| **Web UI** | User-friendly browser interface |
-| **Fast Mode (Beta)** | Quick extraction of up to 21 results per query |
-| **AWS Lambda** | Serverless execution support (experimental) |
 
 ---
 
