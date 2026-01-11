@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
+	"strings"
 
 	// postgres driver
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -171,7 +173,14 @@ func (d *dbrunner) produceSeedJobs(ctx context.Context) error {
 }
 
 func openPsqlConn(dsn string) (conn *sql.DB, err error) {
-	conn, err = sql.Open("pgx", dsn)
+	// Sanitize DSN to handle special characters in password
+	sanitizedDSN, err := sanitizeDSN(dsn)
+	if err != nil {
+		// If sanitization fails, try with original DSN
+		sanitizedDSN = dsn
+	}
+
+	conn, err = sql.Open("pgx", sanitizedDSN)
 	if err != nil {
 		return
 	}
@@ -184,4 +193,60 @@ func openPsqlConn(dsn string) (conn *sql.DB, err error) {
 	conn.SetMaxOpenConns(10)
 
 	return
+}
+
+// sanitizeDSN converts URL format DSN to key-value format to handle special characters in password
+func sanitizeDSN(dsn string) (string, error) {
+	// Check if it's a URL format (postgres:// or postgresql://)
+	if !strings.HasPrefix(dsn, "postgres://") && !strings.HasPrefix(dsn, "postgresql://") {
+		// Assume it's already in key-value format, return as-is
+		return dsn, nil
+	}
+
+	u, err := url.Parse(dsn)
+	if err != nil {
+		return "", err
+	}
+
+	// Convert to key-value format which handles special characters better
+	var parts []string
+
+	// Host and port
+	host := u.Hostname()
+	port := u.Port()
+	if host != "" {
+		parts = append(parts, fmt.Sprintf("host=%s", host))
+	}
+	if port != "" {
+		parts = append(parts, fmt.Sprintf("port=%s", port))
+	}
+
+	// Database name (from path, remove leading slash)
+	dbname := strings.TrimPrefix(u.Path, "/")
+	if dbname != "" {
+		parts = append(parts, fmt.Sprintf("dbname=%s", dbname))
+	}
+
+	// User and password
+	if u.User != nil {
+		username := u.User.Username()
+		if username != "" {
+			parts = append(parts, fmt.Sprintf("user=%s", username))
+		}
+		password, hasPassword := u.User.Password()
+		if hasPassword {
+			// Escape single quotes in password by doubling them
+			password = strings.ReplaceAll(password, "'", "''")
+			parts = append(parts, fmt.Sprintf("password='%s'", password))
+		}
+	}
+
+	// Query parameters (like sslmode)
+	for key, values := range u.Query() {
+		if len(values) > 0 {
+			parts = append(parts, fmt.Sprintf("%s=%s", key, values[0]))
+		}
+	}
+
+	return strings.Join(parts, " "), nil
 }
