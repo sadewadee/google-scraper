@@ -34,7 +34,7 @@ func OpenConnection(dsn string) (*sql.DB, error) {
 	return db, nil
 }
 
-// sanitizeDSN attempts to parse and properly encode the DSN
+// sanitizeDSN converts URL format DSN to key-value format to handle special characters in password
 func sanitizeDSN(dsn string) (string, error) {
 	// Check if it's a URL format (postgres:// or postgresql://)
 	if !strings.HasPrefix(dsn, "postgres://") && !strings.HasPrefix(dsn, "postgresql://") {
@@ -47,16 +47,47 @@ func sanitizeDSN(dsn string) (string, error) {
 		return "", err
 	}
 
-	// Re-encode the password if present
+	// Convert to key-value format which handles special characters better
+	var parts []string
+
+	// Host and port
+	host := u.Hostname()
+	port := u.Port()
+	if host != "" {
+		parts = append(parts, fmt.Sprintf("host=%s", host))
+	}
+	if port != "" {
+		parts = append(parts, fmt.Sprintf("port=%s", port))
+	}
+
+	// Database name (from path, remove leading slash)
+	dbname := strings.TrimPrefix(u.Path, "/")
+	if dbname != "" {
+		parts = append(parts, fmt.Sprintf("dbname=%s", dbname))
+	}
+
+	// User and password
 	if u.User != nil {
+		username := u.User.Username()
+		if username != "" {
+			parts = append(parts, fmt.Sprintf("user=%s", username))
+		}
 		password, hasPassword := u.User.Password()
 		if hasPassword {
-			// The password needs to be properly URL-encoded
-			u.User = url.UserPassword(u.User.Username(), password)
+			// Escape single quotes in password by doubling them
+			password = strings.ReplaceAll(password, "'", "''")
+			parts = append(parts, fmt.Sprintf("password='%s'", password))
 		}
 	}
 
-	return u.String(), nil
+	// Query parameters (like sslmode)
+	for key, values := range u.Query() {
+		if len(values) > 0 {
+			parts = append(parts, fmt.Sprintf("%s=%s", key, values[0]))
+		}
+	}
+
+	return strings.Join(parts, " "), nil
 }
 
 // Repositories holds all repository instances
