@@ -1,3 +1,14 @@
+# Build frontend
+FROM node:20-slim AS frontend-builder
+WORKDIR /web
+COPY web/frontend/package.json web/frontend/package-lock.json ./
+# Create a dummy lock file if it doesn't exist to prevent install failure
+# The context is web/frontend, so we copy files there
+RUN if [ ! -f package-lock.json ]; then echo "{}" > package-lock.json; fi
+RUN npm install
+COPY web/frontend/ .
+RUN npm run build
+
 # Build stage
 FROM golang:1.25.5-trixie AS builder
 WORKDIR /app
@@ -43,5 +54,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /usr/bin/google-maps-scraper /usr/bin/
 COPY --from=builder /root/.cache/rod /root/.cache/rod
+COPY --from=frontend-builder /web/dist /usr/share/google-maps-scraper/static
 
 ENTRYPOINT ["google-maps-scraper"]

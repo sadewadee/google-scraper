@@ -87,6 +87,14 @@ type Config struct {
 	WorkerMode  bool
 	ManagerURL  string
 	WorkerID    string
+	// StaticFolder is the path to static frontend files
+	StaticFolder string
+
+	// ProxyGate flags
+	ProxyGateEnabled         bool
+	ProxyGateAddr            string
+	ProxyGateSources         []string
+	ProxyGateRefreshInterval time.Duration
 }
 
 func ParseConfig() *Config {
@@ -99,7 +107,8 @@ func ParseConfig() *Config {
 	}
 
 	var (
-		proxies string
+		proxies          string
+		proxyGateSources string
 	)
 
 	flag.IntVar(&cfg.Concurrency, "c", min(runtime.NumCPU()/2, 1), "sets the concurrency [default: half of CPU cores]")
@@ -138,6 +147,13 @@ func ParseConfig() *Config {
 	flag.BoolVar(&cfg.WorkerMode, "worker", false, "run as worker (connects to manager)")
 	flag.StringVar(&cfg.ManagerURL, "manager-url", "http://localhost:8080", "manager API URL for worker mode")
 	flag.StringVar(&cfg.WorkerID, "worker-id", "", "worker ID (auto-generated if empty)")
+	flag.StringVar(&cfg.StaticFolder, "static-folder", "", "path to static frontend files")
+
+	// ProxyGate flags
+	flag.BoolVar(&cfg.ProxyGateEnabled, "proxygate", false, "enable embedded proxy gateway")
+	flag.StringVar(&cfg.ProxyGateAddr, "proxygate-addr", "localhost:8081", "proxy gateway listen address")
+	flag.StringVar(&proxyGateSources, "proxygate-sources", "", "comma-separated proxy source URLs (uses defaults if empty)")
+	flag.DurationVar(&cfg.ProxyGateRefreshInterval, "proxygate-refresh", 10*time.Minute, "proxy refresh interval")
 
 	flag.Parse()
 
@@ -183,6 +199,10 @@ func ParseConfig() *Config {
 
 	if proxies != "" {
 		cfg.Proxies = strings.Split(proxies, ",")
+	}
+
+	if proxyGateSources != "" {
+		cfg.ProxyGateSources = strings.Split(proxyGateSources, ",")
 	}
 
 	if cfg.AwsAccessKey != "" && cfg.AwsSecretKey != "" && cfg.AwsRegion != "" {

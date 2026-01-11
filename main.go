@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/gosom/google-maps-scraper/internal/proxygate"
 	"github.com/gosom/google-maps-scraper/runner"
 	"github.com/gosom/google-maps-scraper/runner/databaserunner"
 	"github.com/gosom/google-maps-scraper/runner/filerunner"
@@ -17,10 +18,12 @@ import (
 	"github.com/gosom/google-maps-scraper/runner/managerrunner"
 	"github.com/gosom/google-maps-scraper/runner/webrunner"
 	"github.com/gosom/google-maps-scraper/runner/workerrunner"
+	"golang.org/x/sync/errgroup"
 )
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	runner.Banner()
 
@@ -47,21 +50,46 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := runnerInstance.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
-		os.Stderr.WriteString(err.Error() + "\n")
+	egroup, ctx := errgroup.WithContext(ctx)
 
+	// Start ProxyGate if enabled
+	if cfg.ProxyGateEnabled {
+		pgCfg := &proxygate.Config{
+			Enabled:              true,
+			ListenAddr:           cfg.ProxyGateAddr,
+			SourceURLs:           cfg.ProxyGateSources,
+			RefreshInterval:      cfg.ProxyGateRefreshInterval,
+			ValidatorConcurrency: 50,
+		}
+
+		if len(pgCfg.SourceURLs) == 0 {
+			pgCfg = proxygate.DefaultConfig()
+			pgCfg.ListenAddr = cfg.ProxyGateAddr
+		}
+
+		pg := proxygate.New(pgCfg)
+
+		egroup.Go(func() error {
+			return pg.Run(ctx)
+		})
+	}
+
+	egroup.Go(func() error {
+		if err := runnerInstance.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			return err
+		}
+		return nil
+	})
+
+	if err := egroup.Wait(); err != nil {
+		os.Stderr.WriteString(err.Error() + "\n")
 		_ = runnerInstance.Close(ctx)
 		runner.Telemetry().Close()
-
-		cancel()
-
 		os.Exit(1)
 	}
 
 	_ = runnerInstance.Close(ctx)
 	runner.Telemetry().Close()
-
-	cancel()
 
 	os.Exit(0)
 }
@@ -82,9 +110,10 @@ func runnerFactory(cfg *runner.Config) (runner.Runner, error) {
 		return lambdaaws.NewInvoker(cfg)
 	case runner.RunModeManager:
 		return managerrunner.New(&managerrunner.Config{
-			DatabaseURL: cfg.Dsn,
-			Address:     cfg.Addr,
-			DataFolder:  cfg.DataFolder,
+			DatabaseURL:  cfg.Dsn,
+			Address:      cfg.Addr,
+			DataFolder:   cfg.DataFolder,
+			StaticFolder: cfg.StaticFolder,
 		})
 	case runner.RunModeWorker:
 		return workerrunner.New(&workerrunner.Config{

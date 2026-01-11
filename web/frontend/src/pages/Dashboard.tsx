@@ -25,7 +25,7 @@ export default function Dashboard() {
                     <RecentJobs jobs={recentJobs?.data || []} />
                 </div>
                 <div className="col-span-3">
-                    <ActiveWorkers workers={workers || []} />
+                    <ActiveWorkers workers={workers?.data || []} />
                 </div>
             </div>
         </div>

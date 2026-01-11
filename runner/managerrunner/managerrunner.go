@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -35,6 +36,9 @@ type Config struct {
 
 	// Address is the HTTP server address
 	Address string
+
+	// StaticFolder is the path to static frontend files
+	StaticFolder string
 
 	// DataFolder is where to store temporary files
 	DataFolder string
@@ -136,12 +140,46 @@ func New(cfg *Config) (runner.Runner, error) {
 	// Setup router
 	router := api.NewRouter(jobHandler, workerHandler, statsHandler)
 	apiToken := os.Getenv("API_TOKEN")
+	if apiToken == "" {
+		apiToken = os.Getenv("API_KEY")
+	}
 	handler := router.Setup(apiToken)
+
+	var httpHandler http.Handler = handler
+
+	// Serve static files if configured
+	if cfg.StaticFolder != "" {
+		fs := http.FileServer(http.Dir(cfg.StaticFolder))
+		httpHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// If API path, serve API
+			if strings.HasPrefix(r.URL.Path, "/api") {
+				handler.ServeHTTP(w, r)
+				return
+			}
+
+			// If file exists, serve it
+			path := filepath.Join(cfg.StaticFolder, r.URL.Path)
+			// Check if it's a directory, if so, look for index.html inside?
+			// FileServer handles directory index automatically if index.html exists.
+			// But for SPA we want to fallback to root index.html for unknown routes.
+
+			if _, err := os.Stat(path); err == nil {
+				// File or directory exists
+				// If directory and no index.html, it might list files (we disable listing usually)
+				// But let's rely on FileServer.
+				fs.ServeHTTP(w, r)
+				return
+			}
+
+			// If not found and not API, serve index.html (SPA)
+			http.ServeFile(w, r, filepath.Join(cfg.StaticFolder, "index.html"))
+		})
+	}
 
 	// Create HTTP server
 	srv := &http.Server{
 		Addr:              cfg.Address,
-		Handler:           handler,
+		Handler:           httpHandler,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       60 * time.Second,
 		WriteTimeout:      60 * time.Second,

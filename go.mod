@@ -23,6 +23,8 @@ require (
 	github.com/posthog/posthog-go v1.5.2
 	github.com/shirou/gopsutil/v4 v4.25.4
 	github.com/stretchr/testify v1.10.0
+	github.com/txthinking/socks5 v0.0.0-20251011041537-5c31f201a10e
+	golang.org/x/net v0.42.0
 	golang.org/x/sync v0.16.0
 	golang.org/x/term v0.33.0
 	modernc.org/sqlite v1.37.0
@@ -183,6 +185,7 @@ require (
 	github.com/nishanths/predeclared v0.2.2 // indirect
 	github.com/nunnatsa/ginkgolinter v0.19.1 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
+	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
@@ -235,6 +238,7 @@ require (
 	github.com/tklauser/numcpus v0.10.0 // indirect
 	github.com/tomarrell/wrapcheck/v2 v2.10.0 // indirect
 	github.com/tommy-muehle/go-mnd/v2 v2.5.1 // indirect
+	github.com/txthinking/runnergroup v0.0.0-20250224021307-5864ffeb65ae // indirect
 	github.com/ultraware/funlen v0.2.0 // indirect
 	github.com/ultraware/whitespace v0.2.0 // indirect
 	github.com/uudashr/gocognit v1.2.0 // indirect
@@ -260,7 +264,6 @@ require (
 	golang.org/x/exp v0.0.0-20250506013437-ce4c2cf36ca6 // indirect
 	golang.org/x/exp/typeparams v0.0.0-20250210185358-939b2ce775ac // indirect
 	golang.org/x/mod v0.25.0 // indirect
-	golang.org/x/net v0.42.0 // indirect
 	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/telemetry v0.0.0-20240522233618-39ace7a40ae7 // indirect
 	golang.org/x/text v0.27.0 // indirect

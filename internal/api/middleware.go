@@ -111,6 +111,14 @@ func Auth(token string) func(http.Handler) http.Handler {
 				}
 			}
 
+			// Check query parameter
+			if qKey := r.URL.Query().Get("api_key"); qKey != "" {
+				if subtle.ConstantTimeCompare([]byte(qKey), []byte(token)) == 1 {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+
 			renderError(w, http.StatusUnauthorized, "Unauthorized")
 		})
 	}
