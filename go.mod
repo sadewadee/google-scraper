@@ -1,6 +1,6 @@
 module github.com/sadewadee/google-scraper
 
-go 1.24.6
+go 1.25.5
 
 require (
 	github.com/PuerkitoBio/goquery v1.10.3
