@@ -1,0 +1,211 @@
+version: "3.8"
+
+services:
+  # ===========================================
+  # PostgreSQL Database
+  # ===========================================
+  db:
+    image: postgres:15-alpine
+    container_name: gmaps-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-gmaps}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gmaps_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-gmaps}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gmaps}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - gmaps-network
+
+  # ===========================================
+  # Database Migrations
+  # ===========================================
+  migrate:
+    image: migrate/migrate
+    container_name: gmaps-migrate
+    volumes:
+      - ./scripts/migrations:/migrations:ro
+    command: >
+      -path=/migrations
+      -database=postgres://${POSTGRES_USER:-gmaps}:${POSTGRES_PASSWORD:-gmaps_secret}@db:5432/${POSTGRES_DB:-gmaps}?sslmode=disable
+      up
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - gmaps-network
+    profiles:
+      - legacy
+
+  # ===========================================
+  # Google Maps Scraper - Web UI Mode (Legacy)
+  # Runs both web UI and scraping in same process
+  # ===========================================
+  scraper-web:
+    build:
+      context: .
+      dockerfile: Dockerfile.rod
+    container_name: gmaps-web
+    command:
+      - "-web"
+      - "-addr=:8080"
+      - "-dsn=postgres://${POSTGRES_USER:-gmaps}:${POSTGRES_PASSWORD:-gmaps_secret}@db:5432/${POSTGRES_DB:-gmaps}?sslmode=disable"
+      - "-c=${CONCURRENCY:-4}"
+      - "-depth=${DEPTH:-10}"
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-gmaps}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-gmaps_secret}
+      - POSTGRES_DB=${POSTGRES_DB:-gmaps}
+    volumes:
+      - scraper_data:/data
+      - ./queries:/queries:ro
+      - ./results:/results
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - gmaps-network
+    profiles:
+      - legacy  # Only start with: docker compose --profile legacy up
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 1G
+
+  # ===========================================
+  # Manager (Web UI + API Only - No Scraping)
+  # New architecture: separates management from workers
+  # ===========================================
+  manager:
+    build:
+      context: .
+      dockerfile: Dockerfile.rod
+    container_name: gmaps-manager
+    command:
+      - "-manager"
+      - "-addr=:8080"
+      - "-dsn=postgres://${POSTGRES_USER:-gmaps}:${POSTGRES_PASSWORD:-gmaps_secret}@db:5432/${POSTGRES_DB:-gmaps}?sslmode=disable"
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-gmaps}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-gmaps_secret}
+      - POSTGRES_DB=${POSTGRES_DB:-gmaps}
+      - API_TOKEN=${API_TOKEN}
+    volumes:
+      - manager_data:/data
+      - ./results:/results
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - gmaps-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/api/v2/stats"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+
+  # ===========================================
+  # Scraper Worker (New Distributed Architecture)
+  # Claims jobs from manager, processes independently
+  # Scale with: docker compose up --scale worker=N
+  # ===========================================
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.rod
+    command:
+      - "-worker"
+      - "-manager-url=http://manager:8080"
+      - "-c=${CONCURRENCY:-4}"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-gmaps}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-gmaps_secret}
+    volumes:
+      - worker_data:/data
+      - ./results:/results
+    depends_on:
+      manager:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - gmaps-network
+    deploy:
+      mode: replicated
+      replicas: ${WORKER_COUNT:-1}
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
+  # ===========================================
+  # Scraper Worker (Legacy Distributed Mode)
+  # Connects directly to database
+  # ===========================================
+  worker-legacy:
+    build:
+      context: .
+      dockerfile: Dockerfile.rod
+    command:
+      - "-dsn=postgres://${POSTGRES_USER:-gmaps}:${POSTGRES_PASSWORD:-gmaps_secret}@db:5432/${POSTGRES_DB:-gmaps}?sslmode=disable"
+      - "-c=${CONCURRENCY:-4}"
+      - "-depth=${DEPTH:-10}"
+      - "-produce-only=false"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-gmaps}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-gmaps_secret}
+    volumes:
+      - ./results:/results
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - gmaps-network
+    profiles:
+      - legacy-distributed  # Only start with: docker compose --profile legacy-distributed up
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
+volumes:
+  postgres_data:
+    driver: local
+  scraper_data:
+    driver: local
+  manager_data:
+    driver: local
+  worker_data:
+    driver: local
+
+networks:
+  gmaps-network:
+    driver: bridge

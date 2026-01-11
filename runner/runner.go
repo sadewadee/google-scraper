@@ -29,6 +29,8 @@ const (
 	RunModeWeb
 	RunModeAwsLambda
 	RunModeAwsLambdaInvoker
+	RunModeManager
+	RunModeWorker
 )
 
 var (
@@ -80,6 +82,11 @@ type Config struct {
 	DisablePageReuse         bool
 	ExtraReviews             bool
 	LeadsDBAPIKey            string
+	// Manager/Worker mode flags
+	ManagerMode bool
+	WorkerMode  bool
+	ManagerURL  string
+	WorkerID    string
 }
 
 func ParseConfig() *Config {
@@ -127,6 +134,10 @@ func ParseConfig() *Config {
 	flag.BoolVar(&cfg.DisablePageReuse, "disable-page-reuse", false, "disable page reuse in playwright")
 	flag.BoolVar(&cfg.ExtraReviews, "extra-reviews", false, "enable extra reviews collection")
 	flag.StringVar(&cfg.LeadsDBAPIKey, "leadsdb-api-key", "", "LeadsDB API key for exporting results to LeadsDB")
+	flag.BoolVar(&cfg.ManagerMode, "manager", false, "run as manager (API only, no scraping)")
+	flag.BoolVar(&cfg.WorkerMode, "worker", false, "run as worker (connects to manager)")
+	flag.StringVar(&cfg.ManagerURL, "manager-url", "http://localhost:8080", "manager API URL for worker mode")
+	flag.StringVar(&cfg.WorkerID, "worker-id", "", "worker ID (auto-generated if empty)")
 
 	flag.Parse()
 
@@ -179,6 +190,10 @@ func ParseConfig() *Config {
 	}
 
 	switch {
+	case cfg.ManagerMode:
+		cfg.RunMode = RunModeManager
+	case cfg.WorkerMode:
+		cfg.RunMode = RunModeWorker
 	case cfg.AwsLambdaInvoker:
 		cfg.RunMode = RunModeAwsLambdaInvoker
 	case cfg.AwsLamdbaRunner:

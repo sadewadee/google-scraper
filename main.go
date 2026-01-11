@@ -14,7 +14,9 @@ import (
 	"github.com/gosom/google-maps-scraper/runner/filerunner"
 	"github.com/gosom/google-maps-scraper/runner/installplaywright"
 	"github.com/gosom/google-maps-scraper/runner/lambdaaws"
+	"github.com/gosom/google-maps-scraper/runner/managerrunner"
 	"github.com/gosom/google-maps-scraper/runner/webrunner"
+	"github.com/gosom/google-maps-scraper/runner/workerrunner"
 )
 
 func main() {
@@ -78,6 +80,18 @@ func runnerFactory(cfg *runner.Config) (runner.Runner, error) {
 		return lambdaaws.New(cfg)
 	case runner.RunModeAwsLambdaInvoker:
 		return lambdaaws.NewInvoker(cfg)
+	case runner.RunModeManager:
+		return managerrunner.New(&managerrunner.Config{
+			DatabaseURL: cfg.Dsn,
+			Address:     cfg.Addr,
+			DataFolder:  cfg.DataFolder,
+		})
+	case runner.RunModeWorker:
+		return workerrunner.New(&workerrunner.Config{
+			ManagerURL:   cfg.ManagerURL,
+			WorkerID:     cfg.WorkerID,
+			RunnerConfig: cfg,
+		})
 	default:
 		return nil, fmt.Errorf("%w: %d", runner.ErrInvalidRunMode, cfg.RunMode)
 	}

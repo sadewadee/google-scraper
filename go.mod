@@ -16,6 +16,7 @@ require (
 	github.com/gosom/go-leadsdb v0.0.0-20251228094956-ed313efc171f
 	github.com/gosom/scrapemate v1.0.0
 	github.com/jackc/pgx/v5 v5.7.4
+	github.com/lib/pq v1.10.9
 	github.com/mattn/go-runewidth v0.0.16
 	github.com/mcnijman/go-emailaddress v1.1.1
 	github.com/playwright-community/playwright-go v0.5200.1
