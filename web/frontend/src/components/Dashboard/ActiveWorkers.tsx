@@ -2,33 +2,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/UI/Card"
 import type { Worker } from "@/api/types"
 import { Circle, Server } from "lucide-react"
 
-// Mock data
-const activeWorkers: Worker[] = [
-    {
-        id: "worker-01",
-        name: "Worker 01 - SG",
-        status: "online",
-        last_seen: "2024-01-20T10:20:00Z",
-        stats: { jobs_completed: 150, uptime_seconds: 3600 }
-    },
-    {
-        id: "worker-02",
-        name: "Worker 02 - US",
-        status: "busy",
-        last_seen: "2024-01-20T10:19:55Z",
-        current_job_id: 124,
-        stats: { jobs_completed: 320, uptime_seconds: 7200 }
-    },
-    {
-        id: "worker-03",
-        name: "Worker 03 - DE",
-        status: "offline",
-        last_seen: "2024-01-19T23:00:00Z",
-        stats: { jobs_completed: 45, uptime_seconds: 1200 }
-    },
-]
+interface ActiveWorkersProps {
+    workers: Worker[]
+}
 
-export function ActiveWorkers() {
+export function ActiveWorkers({ workers }: ActiveWorkersProps) {
     return (
         <Card className="h-full">
             <CardHeader>
@@ -36,7 +14,7 @@ export function ActiveWorkers() {
             </CardHeader>
             <CardContent>
                 <div className="space-y-8">
-                    {activeWorkers.map((worker) => (
+                    {workers.map((worker) => (
                         <div key={worker.id} className="flex items-center">
                             <Server className="h-9 w-9 text-muted-foreground p-2 bg-muted rounded-full mr-4" />
                             <div className="ml-4 space-y-1">
@@ -56,6 +34,11 @@ export function ActiveWorkers() {
                             </div>
                         </div>
                     ))}
+                    {workers.length === 0 && (
+                        <div className="text-sm text-muted-foreground text-center py-4">
+                            No active workers
+                        </div>
+                    )}
                 </div>
             </CardContent>
         </Card>

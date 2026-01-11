@@ -1,13 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/UI/Card"
 import { Activity, CheckCircle, Clock, Users } from "lucide-react"
+import { DashboardStats } from "@/api/types"
 
 interface StatsCardsProps {
-    stats?: {
-        total_jobs: number
-        active_jobs: number
-        completed_jobs: number
-        online_workers: number
-    }
+    stats?: DashboardStats
 }
 
 export function StatsCards({ stats }: StatsCardsProps) {
@@ -21,7 +17,7 @@ export function StatsCards({ stats }: StatsCardsProps) {
                 <CardContent>
                     <div className="text-2xl font-bold">{stats?.total_jobs || 0}</div>
                     <p className="text-xs text-muted-foreground">
-                        +20.1% from last month
+                        All time
                     </p>
                 </CardContent>
             </Card>

@@ -1,14 +1,15 @@
 import { StatsCards } from "@/components/Dashboard/StatsCards"
 import { RecentJobs } from "@/components/Dashboard/RecentJobs"
 import { ActiveWorkers } from "@/components/Dashboard/ActiveWorkers"
+import { useDashboardStats, useRecentJobs, useActiveWorkers } from "@/hooks/useDashboard"
 
 export default function Dashboard() {
-    // Mock data for now
-    const stats = {
-        total_jobs: 128,
-        active_jobs: 12,
-        completed_jobs: 110,
-        online_workers: 4
+    const { data: stats, isLoading: isLoadingStats } = useDashboardStats()
+    const { data: recentJobs, isLoading: isLoadingJobs } = useRecentJobs()
+    const { data: workers, isLoading: isLoadingWorkers } = useActiveWorkers()
+
+    if (isLoadingStats || isLoadingJobs || isLoadingWorkers) {
+        return <div>Loading dashboard...</div>
     }
 
     return (
@@ -21,10 +22,10 @@ export default function Dashboard() {
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
                 <div className="col-span-4">
-                    <RecentJobs />
+                    <RecentJobs jobs={recentJobs?.data || []} />
                 </div>
                 <div className="col-span-3">
-                    <ActiveWorkers />
+                    <ActiveWorkers workers={workers || []} />
                 </div>
             </div>
         </div>
