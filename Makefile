@@ -2,9 +2,9 @@ APP_NAME := google_maps_scraper
 VERSION := 1.10.0
 COMMIT_HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE := $(shell date +%Y-%m-%dT%H:%M:%S%z)
-LDFLAGS := -X 'github.com/gosom/google-maps-scraper/runner.Version=$(VERSION)' \
-           -X 'github.com/gosom/google-maps-scraper/runner.Commit=$(COMMIT_HASH)' \
-           -X 'github.com/gosom/google-maps-scraper/runner.BuildDate=$(BUILD_DATE)' \
+LDFLAGS := -X 'github.com/sadewadee/google-scraper/runner.Version=$(VERSION)' \
+           -X 'github.com/sadewadee/google-scraper/runner.Commit=$(COMMIT_HASH)' \
+           -X 'github.com/sadewadee/google-scraper/runner.BuildDate=$(BUILD_DATE)' \
            -w -s
 
 # Database configuration (override with environment variables)

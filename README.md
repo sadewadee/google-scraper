@@ -1,14 +1,14 @@
 # Google Maps Scraper
 
 <p align="center">
-  <a href="https://github.com/gosom/google-maps-scraper/stargazers"><img src="https://img.shields.io/github/stars/gosom/google-maps-scraper?style=social" alt="GitHub Stars"></a>
-  <a href="https://github.com/gosom/google-maps-scraper/network/members"><img src="https://img.shields.io/github/forks/gosom/google-maps-scraper?style=social" alt="GitHub Forks"></a>
+  <a href="https://github.com/sadewadee/google-scraper/stargazers"><img src="https://img.shields.io/github/stars/gosom/google-maps-scraper?style=social" alt="GitHub Stars"></a>
+  <a href="https://github.com/sadewadee/google-scraper/network/members"><img src="https://img.shields.io/github/forks/gosom/google-maps-scraper?style=social" alt="GitHub Forks"></a>
   <a href="https://twitter.com/intent/tweet?text=Powerful%20open-source%20Google%20Maps%20scraper%20-%20extract%20business%20data%20at%20scale%20with%20CLI%2C%20Web%20UI%2C%20or%20REST%20API&url=https%3A%2F%2Fgithub.com%2Fgosom%2Fgoogle-maps-scraper&hashtags=golang,webscraping,googlemaps,opensource"><img src="https://img.shields.io/twitter/url/http/shields.io.svg?style=social" alt="Tweet"></a>
 </p>
 
-[![Build Status](https://github.com/gosom/google-maps-scraper/actions/workflows/build.yml/badge.svg)](https://github.com/gosom/google-maps-scraper/actions/workflows/build.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/gosom/google-maps-scraper)](https://goreportcard.com/report/github.com/gosom/google-maps-scraper)
-[![GoDoc](https://godoc.org/github.com/gosom/google-maps-scraper?status.svg)](https://godoc.org/github.com/gosom/google-maps-scraper)
+[![Build Status](https://github.com/sadewadee/google-scraper/actions/workflows/build.yml/badge.svg)](https://github.com/sadewadee/google-scraper/actions/workflows/build.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/sadewadee/google-scraper)](https://goreportcard.com/report/github.com/sadewadee/google-scraper)
+[![GoDoc](https://godoc.org/github.com/sadewadee/google-scraper?status.svg)](https://godoc.org/github.com/sadewadee/google-scraper)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Chat-7289DA?logo=discord&logoColor=white)](https://discord.gg/fpaAVhNCCu)
 
@@ -497,7 +497,7 @@ This project is **free and open source**, maintained in my spare time. If it's u
 
 | Action | Impact |
 |--------|--------|
-| **[Star this repo](https://github.com/gosom/google-maps-scraper)** | Helps others discover the project |
+| **[Star this repo](https://github.com/sadewadee/google-scraper)** | Helps others discover the project |
 | **[Sponsor on GitHub](https://github.com/sponsors/gosom)** | Directly funds development time |
 | **Share your success** | Tweet or blog about how you use it |
 | **Report bugs & contribute** | Help improve the codebase |
@@ -658,11 +658,11 @@ Please use this scraper responsibly and in accordance with applicable laws and r
 </p>
 
 <p align="center">
-  <a href="https://github.com/gosom/google-maps-scraper/stargazers">
+  <a href="https://github.com/sadewadee/google-scraper/stargazers">
     <img src="https://img.shields.io/github/stars/gosom/google-maps-scraper?style=social" alt="Star on GitHub">
   </a>
 </p>
 
 <p align="center">
-  <b>If this project saved you time, consider <a href="https://github.com/gosom/google-maps-scraper">starring it</a> or <a href="https://github.com/sponsors/gosom">sponsoring</a> its development!</b>
+  <b>If this project saved you time, consider <a href="https://github.com/sadewadee/google-scraper">starring it</a> or <a href="https://github.com/sponsors/gosom">sponsoring</a> its development!</b>
 </p>
