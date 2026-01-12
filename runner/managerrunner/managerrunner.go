@@ -58,6 +58,8 @@ type ManagerRunner struct {
 
 // New creates a new ManagerRunner
 func New(cfg *Config) (runner.Runner, error) {
+	log.Println("manager: starting initialization...")
+
 	// Default address
 	if cfg.Address == "" {
 		cfg.Address = ":8080"
@@ -68,8 +70,10 @@ func New(cfg *Config) (runner.Runner, error) {
 		cfg.DataFolder = "."
 	}
 
+	log.Printf("manager: address=%s, dataFolder=%s", cfg.Address, cfg.DataFolder)
+
 	if err := os.MkdirAll(cfg.DataFolder, os.ModePerm); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create data folder: %w", err)
 	}
 
 	var (
@@ -83,18 +87,26 @@ func New(cfg *Config) (runner.Runner, error) {
 	// Check if using PostgreSQL
 	isPostgres := strings.HasPrefix(cfg.DatabaseURL, "postgres://") || strings.HasPrefix(cfg.DatabaseURL, "postgresql://")
 
+	log.Printf("manager: database type isPostgres=%v", isPostgres)
+
 	if isPostgres {
+		log.Println("manager: connecting to PostgreSQL...")
+
 		// Open PostgreSQL connection
 		db, err = postgres.OpenConnection(cfg.DatabaseURL)
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect to database: %w", err)
 		}
 
+		log.Println("manager: database connected, running migrations...")
+
 		// Run migrations automatically
 		if err := runEmbeddedMigrations(db); err != nil {
 			db.Close()
 			return nil, fmt.Errorf("failed to run migrations: %w", err)
 		}
+
+		log.Println("manager: migrations completed, initializing repositories...")
 
 		// Initialize repositories
 		repos := postgres.NewRepositories(db)
@@ -132,6 +144,8 @@ func New(cfg *Config) (runner.Runner, error) {
 	resultSvc := service.NewResultService(resultRepo)
 	statsSvc := service.NewStatsService(jobRepo, workerRepo, resultRepo)
 
+	log.Println("manager: services initialized, setting up router...")
+
 	// Initialize handlers
 	jobHandler := handlers.NewJobHandler(jobSvc, resultSvc)
 	workerHandler := handlers.NewWorkerHandler(workerSvc)
@@ -143,14 +157,28 @@ func New(cfg *Config) (runner.Runner, error) {
 	if apiToken == "" {
 		apiToken = os.Getenv("API_KEY")
 	}
+
+	if apiToken == "" {
+		log.Println("manager: WARNING - no API_TOKEN set, API will be unprotected!")
+	} else {
+		log.Println("manager: API_TOKEN configured")
+	}
+
 	handler := router.Setup(apiToken)
 
 	var httpHandler http.Handler = handler
 
 	// Serve static files if configured
 	if cfg.StaticFolder != "" {
+		log.Printf("manager: static folder configured at %s", cfg.StaticFolder)
 		fs := http.FileServer(http.Dir(cfg.StaticFolder))
 		httpHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Health check endpoint - always serve from API handler
+			if r.URL.Path == "/health" || r.URL.Path == "/api/v2/health" {
+				handler.ServeHTTP(w, r)
+				return
+			}
+
 			// If API path, serve API
 			if strings.HasPrefix(r.URL.Path, "/api") {
 				handler.ServeHTTP(w, r)
