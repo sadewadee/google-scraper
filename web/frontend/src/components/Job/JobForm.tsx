@@ -1,10 +1,12 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useForm } from "react-hook-form"
+import { AxiosError } from "axios"
 import { Button } from "@/components/UI/Button"
 import { Input } from "@/components/UI/Input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/UI/Card"
 import { jobsApi } from "@/api/jobs"
+import type { JobCreatePayload } from "@/api/types"
 import { AlertCircle, CheckCircle2 } from "lucide-react"
 
 interface FormData {
@@ -75,7 +77,7 @@ export function JobForm() {
             }
 
             // Build request payload matching backend API
-            const payload: any = {
+            const payload: JobCreatePayload = {
                 name: data.name,
                 keywords: keywords,
                 lang: data.lang,
@@ -103,9 +105,13 @@ export function JobForm() {
                     navigate("/jobs")
                 }, 1000)
             }
-        } catch (err: any) {
+        } catch (err) {
             console.error("Failed to create job:", err)
-            setError(err.response?.data?.message || "Failed to create job")
+            if (err instanceof AxiosError) {
+                setError(err.response?.data?.message || "Failed to create job")
+            } else {
+                setError("An unexpected error occurred")
+            }
         }
     }
 

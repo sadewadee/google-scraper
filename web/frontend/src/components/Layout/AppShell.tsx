@@ -6,11 +6,13 @@ import {
     Settings,
     Menu,
     X,
-    Globe
+    Globe,
+    LogOut
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
 import { Button } from "../UI/Button"
+import { removeApiKey } from "@/api/client"
 
 const NAV_ITEMS = [
     { label: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -23,11 +25,16 @@ const NAV_ITEMS = [
 export function Sidebar({ className }: { className?: string }) {
     const location = useLocation()
 
+    const handleLogout = () => {
+        removeApiKey()
+        window.location.href = "/login"
+    }
+
     return (
         <aside className={cn("w-64 bg-neu-base h-screen flex flex-col shadow-neu-flat z-20", className)}>
             <div className="p-6 border-b">
                 <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">
-                    G-Scraper
+                    Scrapy Kremlit
                 </h1>
             </div>
 
@@ -54,16 +61,24 @@ export function Sidebar({ className }: { className?: string }) {
                 })}
             </nav>
 
-            <div className="p-4">
+            <div className="p-4 space-y-3">
                 <div className="flex items-center gap-3 px-3 py-2 bg-neu-base rounded-xl shadow-neu-pressed">
                     <div className="w-8 h-8 rounded-full bg-neu-base shadow-neu-flat flex items-center justify-center text-primary">
                         <span className="text-xs font-bold">A</span>
                     </div>
-                    <div>
+                    <div className="flex-1">
                         <p className="text-sm font-medium">Admin</p>
                         <p className="text-xs text-muted-foreground">Online</p>
                     </div>
                 </div>
+                <Button
+                    variant="ghost"
+                    className="w-full justify-start text-muted-foreground hover:text-destructive"
+                    onClick={handleLogout}
+                >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Logout
+                </Button>
             </div>
         </aside>
     )

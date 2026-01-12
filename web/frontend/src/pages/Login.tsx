@@ -1,6 +1,7 @@
 import { useState } from "react"
-import { useNavigate } from "react-router-dom"
-import { api, setApiKey } from "@/api/client"
+import { useNavigate, Navigate } from "react-router-dom"
+import { AxiosError } from "axios"
+import { api, setApiKey, isAuthenticated } from "@/api/client"
 import { Button } from "@/components/UI/Button"
 import { Input } from "@/components/UI/Input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/UI/Card"
@@ -11,6 +12,11 @@ export default function Login() {
     const [error, setError] = useState("")
     const [loading, setLoading] = useState(false)
     const navigate = useNavigate()
+
+    // Redirect if already authenticated
+    if (isAuthenticated()) {
+        return <Navigate to="/" replace />
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -35,11 +41,15 @@ export default function Login() {
                 setApiKey(apiKeyInput)
                 navigate("/")
             }
-        } catch (err: any) {
-            if (err.response?.status === 401) {
-                setError("Invalid API Key")
+        } catch (err) {
+            if (err instanceof AxiosError) {
+                if (err.response?.status === 401) {
+                    setError("Invalid API Key")
+                } else {
+                    setError("Failed to connect to server")
+                }
             } else {
-                setError("Failed to connect to server")
+                setError("An unexpected error occurred")
             }
         } finally {
             setLoading(false)

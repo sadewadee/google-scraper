@@ -8,6 +8,20 @@ export interface Job {
     priority?: "low" | "normal" | "high"
 }
 
+export interface JobCreatePayload {
+    name: string
+    keywords: string[]
+    lang: string
+    zoom: number
+    radius: number
+    depth: number
+    fast_mode: boolean
+    extract_email: boolean
+    priority: number
+    lat?: number
+    lon?: number
+}
+
 export interface Worker {
     id: string
     name: string

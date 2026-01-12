@@ -1,5 +1,5 @@
 import { api } from "./client"
-import type { Job, ApiResponse } from "./types"
+import type { Job, JobCreatePayload, ApiResponse } from "./types"
 
 export const jobsApi = {
     getAll: async (): Promise<ApiResponse<Job[]>> => {
@@ -12,7 +12,7 @@ export const jobsApi = {
         return response.data
     },
 
-    create: async (data: Partial<Job>): Promise<ApiResponse<Job>> => {
+    create: async (data: JobCreatePayload): Promise<ApiResponse<Job>> => {
         const response = await api.post<ApiResponse<Job>>("/jobs", data)
         return response.data
     },
