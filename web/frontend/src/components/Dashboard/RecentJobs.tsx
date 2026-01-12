@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom"
 import {
     Table,
     TableBody,
@@ -26,21 +27,29 @@ export function RecentJobs({ jobs }: RecentJobsProps) {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-[100px]">ID</TableHead>
-                            <TableHead>Keyword</TableHead>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Keywords</TableHead>
                             <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Results</TableHead>
+                            <TableHead className="text-right">Progress</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {jobs.map((job) => (
                             <TableRow key={job.id}>
-                                <TableCell className="font-medium">{job.id}</TableCell>
-                                <TableCell>{job.keyword}</TableCell>
+                                <TableCell className="font-medium">
+                                    <Link to={`/jobs/${job.id}`} className="hover:underline">
+                                        {job.name}
+                                    </Link>
+                                </TableCell>
+                                <TableCell className="text-muted-foreground text-xs max-w-[150px] truncate">
+                                    {job.config.keywords.join(", ")}
+                                </TableCell>
                                 <TableCell>
                                     <Badge variant={job.status}>{job.status}</Badge>
                                 </TableCell>
-                                <TableCell className="text-right">{job.result_count || "-"}</TableCell>
+                                <TableCell className="text-right">
+                                    {job.progress.scraped_places}/{job.progress.total_places || "-"}
+                                </TableCell>
                             </TableRow>
                         ))}
                     </TableBody>

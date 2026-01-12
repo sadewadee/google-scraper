@@ -34,7 +34,7 @@ export default function JobDetail() {
                     <div>
                         <h2 className="text-2xl font-bold tracking-tight flex items-center gap-3">
                             Job #{id}
-                            <Badge variant={job.status as any}>{job.status}</Badge>
+                            <Badge variant={job.status}>{job.status}</Badge>
                         </h2>
                         <p className="text-muted-foreground">Created on {new Date(job.created_at).toLocaleDateString()}</p>
                     </div>
@@ -58,7 +58,12 @@ export default function JobDetail() {
                         <CardTitle className="text-sm font-medium">Total Results</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{job.result_count}</div>
+                        <div className="text-2xl font-bold">{job.progress.scraped_places}/{job.progress.total_places || "-"}</div>
+                        {job.progress.percentage > 0 && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                                {Math.round(job.progress.percentage)}% completed
+                            </p>
+                        )}
                     </CardContent>
                 </Card>
                 <Card>
@@ -79,13 +84,26 @@ export default function JobDetail() {
                     <CardContent>
                         <div className="text-sm space-y-1">
                             <div className="flex justify-between">
-                                <span className="text-muted-foreground">Keyword:</span>
-                                <span className="font-medium">{job.keyword}</span>
+                                <span className="text-muted-foreground">Name:</span>
+                                <span className="font-medium">{job.name}</span>
                             </div>
-                            <div className="flex justify-between">
+                            <div className="flex flex-col gap-1 mt-1">
+                                <span className="text-muted-foreground">Keywords:</span>
+                                <div className="flex flex-wrap gap-1">
+                                    {job.config.keywords.map((k, i) => (
+                                        <Badge key={i} variant="outline" className="text-xs">
+                                            {k}
+                                        </Badge>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="flex justify-between mt-2">
                                 <span className="text-muted-foreground">Location:</span>
                                 <span className="font-medium flex items-center gap-1">
-                                    <MapPin className="h-3 w-3" /> -
+                                    <MapPin className="h-3 w-3" />
+                                    {job.config.geo_lat && job.config.geo_lon
+                                        ? `${job.config.geo_lat}, ${job.config.geo_lon}`
+                                        : "Auto"}
                                 </span>
                             </div>
                         </div>

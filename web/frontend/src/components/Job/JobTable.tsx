@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { Link } from "react-router-dom"
 import { jobsApi } from "@/api/jobs"
 import {
     Table,
@@ -14,16 +15,16 @@ import { Button } from "@/components/UI/Button"
 import { Input } from "@/components/UI/Input"
 import {
     Trash2,
-    Play,
-    Pause,
-    Search
+    XCircle,
+    Search,
+    Eye
 } from "lucide-react"
 
 export function JobTable() {
     const [searchTerm, setSearchTerm] = useState("")
     const queryClient = useQueryClient()
 
-    const { data: jobs, isLoading } = useQuery({
+    const { data: response, isLoading, error } = useQuery({
         queryKey: ["jobs"],
         queryFn: jobsApi.getAll,
     })
@@ -35,9 +36,18 @@ export function JobTable() {
         }
     })
 
-    const filteredJobs = jobs?.data?.filter(job =>
-        job.keyword.toLowerCase().includes(searchTerm.toLowerCase())
-    ) || []
+    const cancelMutation = useMutation({
+        mutationFn: jobsApi.cancel,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["jobs"] })
+        }
+    })
+
+    const jobs = response?.data || []
+    const filteredJobs = jobs.filter(job =>
+        job.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        job.config.keywords.some(k => k.toLowerCase().includes(searchTerm.toLowerCase()))
+    )
 
     return (
         <div className="space-y-4">
@@ -51,15 +61,21 @@ export function JobTable() {
                 />
             </div>
 
+            {error && (
+                <div className="text-destructive text-sm p-4 bg-destructive/10 rounded-md">
+                    Failed to load jobs: {error instanceof Error ? error.message : "Unknown error"}
+                </div>
+            )}
+
             <div className="rounded-md bg-neu-base shadow-neu-flat">
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-[100px]">ID</TableHead>
-                            <TableHead>Keyword</TableHead>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Keywords</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Priority</TableHead>
-                            <TableHead className="text-right">Results</TableHead>
+                            <TableHead className="text-right">Progress</TableHead>
                             <TableHead>Created At</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
@@ -80,42 +96,61 @@ export function JobTable() {
                         ) : (
                             filteredJobs.map((job) => (
                                 <TableRow key={job.id}>
-                                    <TableCell className="font-medium">#{job.id}</TableCell>
-                                    <TableCell className="font-medium">{job.keyword}</TableCell>
+                                    <TableCell className="font-medium">
+                                        <Link to={`/jobs/${job.id}`} className="hover:underline">
+                                            {job.name}
+                                        </Link>
+                                    </TableCell>
+                                    <TableCell className="text-muted-foreground text-xs max-w-[200px] truncate">
+                                        {job.config.keywords.join(", ")}
+                                    </TableCell>
                                     <TableCell>
                                         <Badge variant={job.status}>{job.status}</Badge>
                                     </TableCell>
                                     <TableCell>
-                                        <span className={`text-xs capitalize ${job.priority === 'high' ? 'text-red-500 font-bold' :
-                                            job.priority === 'low' ? 'text-gray-500' : 'text-foreground'
+                                        <span className={`text-xs ${job.priority >= 8 ? 'text-red-500 font-bold' :
+                                            job.priority <= 3 ? 'text-gray-500' : 'text-foreground'
                                             }`}>
                                             {job.priority}
                                         </span>
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        {job.result_count !== undefined ? job.result_count : "-"}
+                                        {job.progress.scraped_places}/{job.progress.total_places || "-"}
+                                        {job.progress.percentage > 0 && (
+                                            <span className="text-muted-foreground ml-1">
+                                                ({Math.round(job.progress.percentage)}%)
+                                            </span>
+                                        )}
                                     </TableCell>
                                     <TableCell className="text-muted-foreground text-xs">
                                         {new Date(job.created_at).toLocaleDateString()}
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        <div className="flex justify-end gap-2">
-                                            {job.status === 'processing' ? (
-                                                <Button variant="ghost" size="icon" title="Pause">
-                                                    <Pause className="h-4 w-4" />
+                                        <div className="flex justify-end gap-1">
+                                            <Button variant="ghost" size="icon" asChild title="View">
+                                                <Link to={`/jobs/${job.id}`}>
+                                                    <Eye className="h-4 w-4" />
+                                                </Link>
+                                            </Button>
+
+                                            {(job.status === 'pending' || job.status === 'running') && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    title="Cancel"
+                                                    onClick={() => cancelMutation.mutate(Number(job.id))}
+                                                    disabled={cancelMutation.isPending}
+                                                >
+                                                    <XCircle className="h-4 w-4" />
                                                 </Button>
-                                            ) : (job.status === 'pending' || job.status === 'cancelled') ? (
-                                                <Button variant="ghost" size="icon" title="Resume/Start">
-                                                    <Play className="h-4 w-4" />
-                                                </Button>
-                                            ) : null}
+                                            )}
 
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
                                                 className="text-destructive hover:text-destructive"
                                                 title="Delete"
-                                                onClick={() => deleteMutation.mutate(job.id)}
+                                                onClick={() => deleteMutation.mutate(Number(job.id))}
                                                 disabled={deleteMutation.isPending}
                                             >
                                                 <Trash2 className="h-4 w-4" />

@@ -1,11 +1,33 @@
 export interface Job {
-    id: number
-    keyword: string
-    status: "pending" | "processing" | "completed" | "failed" | "cancelled"
+    id: string
+    name: string
+    status: "pending" | "queued" | "running" | "paused" | "completed" | "failed" | "cancelled"
+    priority: number
+    config: {
+        keywords: string[]
+        lang: string
+        geo_lat?: number
+        geo_lon?: number
+        zoom: number
+        radius: number
+        depth: number
+        fast_mode: boolean
+        extract_email: boolean
+        max_time: number
+        proxies?: string[]
+    }
+    progress: {
+        total_places: number
+        scraped_places: number
+        failed_places: number
+        percentage: number
+    }
+    worker_id?: string
     created_at: string
     updated_at: string
-    result_count?: number
-    priority?: "low" | "normal" | "high"
+    started_at?: string
+    completed_at?: string
+    error_message?: string
 }
 
 export interface JobCreatePayload {
