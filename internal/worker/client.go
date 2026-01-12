@@ -210,8 +210,33 @@ func (c *Client) Unregister(ctx context.Context) error {
 
 // SubmitResults submits results to the manager
 func (c *Client) SubmitResults(ctx context.Context, jobID uuid.UUID, data [][]byte) error {
-	// TODO: Implement result submission endpoint
-	// For now, workers will write directly to the database
+	// Encode data as base64 or send as JSON array of bytes?
+	// The body will be JSON: { "data": [ "base64encoded", ... ] } or just array of objects if data is json
+	// But data here is [][]byte.
+	// Let's assume data is already JSON bytes or CSV rows.
+	// To keep it simple, we'll send a struct
+
+	type ResultBatch struct {
+		JobID uuid.UUID `json:"job_id"`
+		Data  [][]byte  `json:"data"`
+	}
+
+	batch := ResultBatch{
+		JobID: jobID,
+		Data:  data,
+	}
+
+	url := fmt.Sprintf("/api/v2/jobs/%s/results", jobID.String())
+	resp, err := c.post(ctx, url, batch)
+	if err != nil {
+		return fmt.Errorf("failed to submit results: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		return c.parseError(resp)
+	}
+
 	return nil
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/sadewadee/google-scraper/gmaps"
 	"github.com/sadewadee/google-scraper/internal/domain"
+	"github.com/sadewadee/google-scraper/internal/service"
 )
 
 // JobServiceInterface defines the job service methods
@@ -30,6 +32,7 @@ type JobServiceInterface interface {
 
 // ResultServiceInterface defines the result service methods
 type ResultServiceInterface interface {
+	CreateBatch(ctx context.Context, jobID uuid.UUID, data [][]byte) error
 	ListByJobID(ctx context.Context, jobID uuid.UUID, limit, offset int) ([][]byte, int, error)
 	StreamByJobID(ctx context.Context, jobID uuid.UUID, fn func(data []byte) error) error
 }
@@ -38,6 +41,49 @@ type ResultServiceInterface interface {
 type JobHandler struct {
 	jobs    JobServiceInterface
 	results ResultServiceInterface
+}
+
+// ResultBatch represents a batch of results
+type ResultBatch struct {
+	JobID uuid.UUID `json:"job_id"`
+	Data  [][]byte  `json:"data"`
+}
+
+// SubmitResults handles POST /api/v2/jobs/{id}/results
+func (h *JobHandler) SubmitResults(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		RenderError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	id, err := parseJobID(r)
+	if err != nil {
+		RenderError(w, http.StatusBadRequest, "Invalid job ID")
+		return
+	}
+
+	var batch ResultBatch
+	if err := json.NewDecoder(r.Body).Decode(&batch); err != nil {
+		RenderError(w, http.StatusBadRequest, "Invalid request body: "+err.Error())
+		return
+	}
+
+	if batch.JobID != uuid.Nil && batch.JobID != id {
+		RenderError(w, http.StatusBadRequest, "Job ID mismatch")
+		return
+	}
+
+	if len(batch.Data) == 0 {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if err := h.results.CreateBatch(r.Context(), id, batch.Data); err != nil {
+		RenderError(w, http.StatusInternalServerError, "Failed to save results: "+err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
 }
 
 // NewJobHandler creates a new JobHandler
@@ -185,7 +231,11 @@ func (h *JobHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 
 	job, err := h.jobs.GetByID(r.Context(), id)
 	if err != nil {
-		RenderError(w, http.StatusNotFound, "Job not found")
+		if errors.Is(err, service.ErrJobNotFound) {
+			RenderError(w, http.StatusNotFound, "Job not found")
+		} else {
+			RenderError(w, http.StatusInternalServerError, "Failed to retrieve job: "+err.Error())
+		}
 		return
 	}
 
@@ -206,7 +256,11 @@ func (h *JobHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.jobs.Delete(r.Context(), id); err != nil {
-		RenderError(w, http.StatusInternalServerError, "Failed to delete job: "+err.Error())
+		if errors.Is(err, service.ErrJobNotFound) {
+			RenderError(w, http.StatusNotFound, "Job not found")
+		} else {
+			RenderError(w, http.StatusInternalServerError, "Failed to delete job: "+err.Error())
+		}
 		return
 	}
 
@@ -228,7 +282,11 @@ func (h *JobHandler) Pause(w http.ResponseWriter, r *http.Request) {
 
 	job, err := h.jobs.Pause(r.Context(), id)
 	if err != nil {
-		RenderError(w, http.StatusBadRequest, err.Error())
+		if errors.Is(err, service.ErrJobNotFound) {
+			RenderError(w, http.StatusNotFound, "Job not found")
+		} else {
+			RenderError(w, http.StatusBadRequest, "Failed to pause job: "+err.Error())
+		}
 		return
 	}
 
@@ -250,7 +308,11 @@ func (h *JobHandler) Resume(w http.ResponseWriter, r *http.Request) {
 
 	job, err := h.jobs.Resume(r.Context(), id)
 	if err != nil {
-		RenderError(w, http.StatusBadRequest, err.Error())
+		if errors.Is(err, service.ErrJobNotFound) {
+			RenderError(w, http.StatusNotFound, "Job not found")
+		} else {
+			RenderError(w, http.StatusBadRequest, "Failed to resume job: "+err.Error())
+		}
 		return
 	}
 
@@ -272,7 +334,11 @@ func (h *JobHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 
 	job, err := h.jobs.Cancel(r.Context(), id)
 	if err != nil {
-		RenderError(w, http.StatusBadRequest, err.Error())
+		if errors.Is(err, service.ErrJobNotFound) {
+			RenderError(w, http.StatusNotFound, "Job not found")
+		} else {
+			RenderError(w, http.StatusBadRequest, "Failed to cancel job: "+err.Error())
+		}
 		return
 	}
 

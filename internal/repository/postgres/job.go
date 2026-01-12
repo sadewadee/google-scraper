@@ -104,6 +104,10 @@ func NewJobRepository(db *sql.DB) *JobRepository {
 
 // Create creates a new job
 func (r *JobRepository) Create(ctx context.Context, job *domain.Job) error {
+	// Add timeout to fail fast
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
 	query := `
 		INSERT INTO jobs_queue (
 			id, name, status, priority,

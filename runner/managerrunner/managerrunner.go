@@ -83,6 +83,7 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 		jobRepo    domain.JobRepository
 		workerRepo domain.WorkerRepository
 		resultRepo domain.ResultRepository
+		proxyRepo  domain.ProxyRepository
 		err        error
 	)
 
@@ -115,6 +116,7 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 		jobRepo = repos.Jobs
 		workerRepo = repos.Workers
 		resultRepo = repos.Results
+		proxyRepo = repos.Proxies
 	} else {
 		// Default to SQLite
 		if cfg.DatabaseURL == "" {
@@ -152,7 +154,31 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 	jobHandler := handlers.NewJobHandler(jobSvc, resultSvc)
 	workerHandler := handlers.NewWorkerHandler(workerSvc)
 	statsHandler := handlers.NewStatsHandler(statsSvc)
-	proxyHandler := handlers.NewProxyHandler(pg)
+	proxyHandler := handlers.NewProxyHandler(pg, proxyRepo)
+
+	// Load sources if proxyRepo is available
+	if proxyRepo != nil && pg != nil {
+		ctx := context.Background()
+		sources, err := proxyRepo.List(ctx)
+		if err != nil {
+			log.Printf("manager: failed to load proxy sources: %v", err)
+		} else {
+			count := 0
+			for _, s := range sources {
+				pg.AddSource(s.URL)
+				count++
+			}
+			if count > 0 {
+				log.Printf("manager: loaded %d proxy sources from database", count)
+				// Trigger refresh to fetch from new sources
+				go func() {
+					if err := pg.Refresh(context.Background()); err != nil {
+						log.Printf("manager: failed to refresh proxies after loading sources: %v", err)
+					}
+				}()
+			}
+		}
+	}
 
 	// Setup router
 	router := api.NewRouter(jobHandler, workerHandler, statsHandler, proxyHandler)

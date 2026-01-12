@@ -2,6 +2,7 @@ package proxygate
 
 import (
 	"context"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -43,12 +44,20 @@ func (pg *ProxyGate) Refresh(ctx context.Context) error {
 	return pg.fetcher.ForceRefresh(ctx)
 }
 
-func (pg *ProxyGate) GetStats() (int, int) {
+func (pg *ProxyGate) GetStats() (int, int, time.Time) {
 	// total, healthy
 	// For now assume all in pool are healthy
-	return pg.pool.Size(), pg.pool.Size()
+	return pg.pool.Size(), pg.pool.Size(), pg.fetcher.LastUpdated()
 }
 
 func (pg *ProxyGate) GetSources() []string {
-	return pg.fetcher.sources
+	return pg.fetcher.GetSources()
+}
+
+func (pg *ProxyGate) AddSource(url string) {
+	pg.fetcher.AddSource(url)
+}
+
+func (pg *ProxyGate) RemoveSource(url string) {
+	pg.fetcher.RemoveSource(url)
 }

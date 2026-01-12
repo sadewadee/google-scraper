@@ -6,13 +6,16 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
 type Fetcher struct {
-	sources []string
-	pool    *Pool
-	client  *http.Client
+	sources     []string
+	pool        *Pool
+	client      *http.Client
+	mu          sync.RWMutex
+	lastUpdated time.Time
 }
 
 func NewFetcher(sources []string, pool *Pool) *Fetcher {
@@ -47,12 +50,22 @@ func (f *Fetcher) Run(ctx context.Context) error {
 }
 
 func (f *Fetcher) fetchAll(ctx context.Context) error {
-	for _, url := range f.sources {
+	f.mu.RLock()
+	sources := make([]string, len(f.sources))
+	copy(sources, f.sources)
+	f.mu.RUnlock()
+
+	for _, url := range sources {
 		if err := f.fetchOne(ctx, url); err != nil {
 			log.Printf("[ProxyGate] Fetch from %s failed: %v", url, err)
 			continue
 		}
 	}
+
+	f.mu.Lock()
+	f.lastUpdated = time.Now()
+	f.mu.Unlock()
+
 	return nil
 }
 
@@ -87,4 +100,40 @@ func (f *Fetcher) fetchOne(ctx context.Context, url string) error {
 	}
 
 	return scanner.Err()
+}
+
+func (f *Fetcher) LastUpdated() time.Time {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	return f.lastUpdated
+}
+
+func (f *Fetcher) AddSource(url string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, s := range f.sources {
+		if s == url {
+			return
+		}
+	}
+	f.sources = append(f.sources, url)
+}
+
+func (f *Fetcher) RemoveSource(url string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i, s := range f.sources {
+		if s == url {
+			f.sources = append(f.sources[:i], f.sources[i+1:]...)
+			return
+		}
+	}
+}
+
+func (f *Fetcher) GetSources() []string {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	sources := make([]string, len(f.sources))
+	copy(sources, f.sources)
+	return sources
 }

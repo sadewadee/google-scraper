@@ -92,6 +92,10 @@ func (j *EmailExtractJob) ProcessOnFetchError() bool {
 	return true
 }
 
+func (j *EmailExtractJob) UseInResults() bool {
+	return true
+}
+
 func docEmailExtractor(doc *goquery.Document) []string {
 	seen := map[string]bool{}
 

@@ -89,3 +89,18 @@ type ResultRepository interface {
 	// StreamByJobID streams results for a job (memory efficient)
 	StreamByJobID(ctx context.Context, jobID uuid.UUID, fn func(data []byte) error) error
 }
+
+// ProxyRepository defines the interface for proxy source persistence
+type ProxyRepository interface {
+	// Create creates a new proxy source
+	Create(ctx context.Context, url string) (*ProxySource, error)
+
+	// Delete deletes a proxy source by ID
+	Delete(ctx context.Context, id int64) error
+
+	// List retrieves all proxy sources
+	List(ctx context.Context) ([]*ProxySource, error)
+
+	// GetByID retrieves a proxy source by ID
+	GetByID(ctx context.Context, id int64) (*ProxySource, error)
+}

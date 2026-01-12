@@ -5,7 +5,6 @@ import (
 	"encoding/csv"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -172,7 +171,11 @@ func (r *Runner) processJob(ctx context.Context, job *domain.Job) (int, error) {
 	}
 	defer outfile.Close()
 
-	mate, err := r.setupMate(ctx, outfile, job)
+	csvWriter := csvwriter.NewCsvWriter(csv.NewWriter(outfile))
+	memWriter := &MemoryWriter{}
+	writers := []scrapemate.ResultWriter{csvWriter, memWriter}
+
+	mate, err := r.setupMate(ctx, writers, job)
 	if err != nil {
 		return 0, err
 	}
@@ -242,12 +245,19 @@ func (r *Runner) processJob(ctx context.Context, job *domain.Job) (int, error) {
 	cancel()
 	mate.Close()
 
-	// TODO: Count results from CSV file or implement result counting
-	// For now return 0 as place count
-	return 0, nil
+	// Submit results to manager
+	results := memWriter.GetResults()
+	if len(results) > 0 {
+		log.Printf("submitting %d results to manager", len(results))
+		if err := r.client.SubmitResults(ctx, job.ID, results); err != nil {
+			return 0, fmt.Errorf("failed to submit results: %w", err)
+		}
+	}
+
+	return len(results), nil
 }
 
-func (r *Runner) setupMate(_ context.Context, writer io.Writer, job *domain.Job) (*scrapemateapp.ScrapemateApp, error) {
+func (r *Runner) setupMate(_ context.Context, writers []scrapemate.ResultWriter, job *domain.Job) (*scrapemateapp.ScrapemateApp, error) {
 	opts := []func(*scrapemateapp.Config) error{
 		scrapemateapp.WithConcurrency(r.config.Concurrency),
 		scrapemateapp.WithExitOnInactivity(time.Minute * 3),
@@ -283,10 +293,6 @@ func (r *Runner) setupMate(_ context.Context, writer io.Writer, job *domain.Job)
 	}
 
 	log.Printf("job %s has proxy: %v", job.ID, hasProxy)
-
-	csvWriter := csvwriter.NewCsvWriter(csv.NewWriter(writer))
-
-	writers := []scrapemate.ResultWriter{csvWriter}
 
 	matecfg, err := scrapemateapp.NewConfig(
 		writers,

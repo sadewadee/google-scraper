@@ -53,7 +53,7 @@ func (r *Router) Setup(token string) http.Handler {
 	r.mux.HandleFunc("/api/v2/jobs/{id}/pause", r.jobs.Pause)
 	r.mux.HandleFunc("/api/v2/jobs/{id}/resume", r.jobs.Resume)
 	r.mux.HandleFunc("/api/v2/jobs/{id}/cancel", r.jobs.Cancel)
-	r.mux.HandleFunc("/api/v2/jobs/{id}/results", r.jobs.GetResults)
+	r.mux.HandleFunc("/api/v2/jobs/{id}/results", r.handleJobResults)
 	r.mux.HandleFunc("/api/v2/jobs/{id}/download", r.jobs.DownloadResults)
 
 	// Worker endpoints
@@ -142,4 +142,16 @@ func (r *Router) healthCheck(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"ok"}`))
+}
+
+// handleJobResults routes requests for /api/v2/jobs/{id}/results
+func (r *Router) handleJobResults(w http.ResponseWriter, req *http.Request) {
+	switch req.Method {
+	case http.MethodGet:
+		r.jobs.GetResults(w, req)
+	case http.MethodPost:
+		r.jobs.SubmitResults(w, req)
+	default:
+		handlers.RenderError(w, http.StatusMethodNotAllowed, "Method not allowed")
+	}
 }
