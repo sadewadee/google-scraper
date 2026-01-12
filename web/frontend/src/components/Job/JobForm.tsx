@@ -1,98 +1,277 @@
+import { useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Button } from "@/components/UI/Button"
 import { Input } from "@/components/UI/Input"
-import { Card, CardContent } from "@/components/UI/Card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/UI/Card"
 import { cn } from "@/lib/utils"
+import { jobsApi } from "@/api/jobs"
+import { AlertCircle, CheckCircle2 } from "lucide-react"
 
 const formSchema = z.object({
-    keyword: z.string().min(3, {
-        message: "Keyword must be at least 3 characters.",
-    }),
-    location: z.string().optional(),
-    depth: z.coerce.number().min(1).max(100),
-    priority: z.enum(["low", "normal", "high"]),
+    name: z.string().min(1, "Job name is required"),
+    keywords: z.string().min(3, "Enter at least one keyword"),
+    lang: z.string().default("en"),
+    lat: z.string().optional(),
+    lon: z.string().optional(),
+    zoom: z.coerce.number().min(1).max(21).default(15),
+    radius: z.coerce.number().min(100).max(50000).default(10000),
+    depth: z.coerce.number().min(1).max(100).default(10),
+    fast_mode: z.boolean().default(false),
+    extract_email: z.boolean().default(false),
+    priority: z.coerce.number().min(0).max(10).default(5),
 })
 
+type FormData = z.infer<typeof formSchema>
+
 export function JobForm() {
+    const navigate = useNavigate()
+    const [error, setError] = useState<string | null>(null)
+    const [success, setSuccess] = useState(false)
+
     const {
         register,
         handleSubmit,
         formState: { errors, isSubmitting },
         reset,
-    } = useForm<any>({
+    } = useForm<FormData>({
         resolver: zodResolver(formSchema),
         defaultValues: {
-            keyword: "",
-            location: "",
-            depth: 20,
-            priority: "normal",
+            name: "",
+            keywords: "",
+            lang: "en",
+            lat: "",
+            lon: "",
+            zoom: 15,
+            radius: 10000,
+            depth: 10,
+            fast_mode: false,
+            extract_email: false,
+            priority: 5,
         },
     })
 
-    function onSubmit(data: any) {
-        // Determine wait time to simulate API call
-        console.log("Submitting job:", data)
-        setTimeout(() => {
-            alert(JSON.stringify(data, null, 2))
-            reset()
-        }, 1000)
+    async function onSubmit(data: FormData) {
+        setError(null)
+        setSuccess(false)
+
+        try {
+            // Parse keywords from comma-separated or newline-separated string
+            const keywords = data.keywords
+                .split(/[,\n]/)
+                .map((k) => k.trim())
+                .filter((k) => k.length > 0)
+
+            if (keywords.length === 0) {
+                setError("At least one keyword is required")
+                return
+            }
+
+            // Build request payload matching backend API
+            const payload: any = {
+                name: data.name,
+                keywords: keywords,
+                lang: data.lang,
+                zoom: data.zoom,
+                radius: data.radius,
+                depth: data.depth,
+                fast_mode: data.fast_mode,
+                extract_email: data.extract_email,
+                priority: data.priority,
+            }
+
+            // Add lat/lon if provided
+            if (data.lat && data.lon) {
+                payload.lat = parseFloat(data.lat)
+                payload.lon = parseFloat(data.lon)
+            }
+
+            const response = await jobsApi.create(payload)
+
+            if (response) {
+                setSuccess(true)
+                reset()
+                // Redirect to jobs list after 1 second
+                setTimeout(() => {
+                    navigate("/jobs")
+                }, 1000)
+            }
+        } catch (err: any) {
+            console.error("Failed to create job:", err)
+            setError(err.response?.data?.message || "Failed to create job")
+        }
     }
 
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <Card>
-                <CardContent className="pt-6 space-y-4">
+                <CardHeader>
+                    <CardTitle>Job Details</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
                     <div className="space-y-2">
-                        <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                            Search Keyword
-                        </label>
+                        <label className="text-sm font-medium">Job Name *</label>
                         <Input
-                            placeholder="e.g. coffee shop near me"
-                            {...register("keyword")}
-                            className={cn(errors.keyword && "border-destructive")}
+                            placeholder="e.g. Coffee Shops Jakarta"
+                            {...register("name")}
+                            className={cn(errors.name && "border-destructive")}
                         />
-                        {errors.keyword && (
-                            <p className="text-sm text-destructive">{String(errors.keyword.message)}</p>
+                        {errors.name && (
+                            <p className="text-sm text-destructive">{errors.name.message}</p>
                         )}
-                        <p className="text-xs text-muted-foreground">The search query to send to Google Maps.</p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">Keywords *</label>
+                        <textarea
+                            placeholder="Enter keywords (one per line or comma-separated)&#10;e.g. coffee shop jakarta&#10;restaurant bandung"
+                            {...register("keywords")}
+                            rows={4}
+                            className={cn(
+                                "flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+                                errors.keywords && "border-destructive"
+                            )}
+                        />
+                        {errors.keywords && (
+                            <p className="text-sm text-destructive">{errors.keywords.message}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                            Enter search queries for Google Maps. Each keyword will be scraped separately.
+                        </p>
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-2">
-                            <label className="text-sm font-medium leading-none">Location (Optional)</label>
-                            <Input placeholder="e.g. Jakarta, Indonesia" {...register("location")} />
+                            <label className="text-sm font-medium">Language</label>
+                            <select
+                                {...register("lang")}
+                                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                            >
+                                <option value="en">English</option>
+                                <option value="id">Indonesian</option>
+                                <option value="de">German</option>
+                                <option value="fr">French</option>
+                                <option value="es">Spanish</option>
+                                <option value="ja">Japanese</option>
+                                <option value="ko">Korean</option>
+                                <option value="zh">Chinese</option>
+                            </select>
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-sm font-medium leading-none">Max Results (Depth)</label>
+                            <label className="text-sm font-medium">Priority (0-10)</label>
                             <Input
                                 type="number"
-                                {...register("depth")}
+                                min={0}
+                                max={10}
+                                {...register("priority")}
                             />
-                            {errors.depth && (
-                                <p className="text-sm text-destructive">{String(errors.depth.message)}</p>
-                            )}
+                            <p className="text-xs text-muted-foreground">Higher = processed first</p>
                         </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium leading-none">Priority</label>
-                        <select
-                            className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                            {...register("priority")}
-                        >
-                            <option value="low">Low</option>
-                            <option value="normal">Normal</option>
-                            <option value="high">High</option>
-                        </select>
                     </div>
                 </CardContent>
             </Card>
 
+            <Card>
+                <CardHeader>
+                    <CardTitle>Search Settings</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-3">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Depth (Max Results)</label>
+                            <Input
+                                type="number"
+                                min={1}
+                                max={100}
+                                {...register("depth")}
+                            />
+                            {errors.depth && (
+                                <p className="text-sm text-destructive">{errors.depth.message}</p>
+                            )}
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Zoom Level</label>
+                            <Input
+                                type="number"
+                                min={1}
+                                max={21}
+                                {...register("zoom")}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Radius (meters)</label>
+                            <Input
+                                type="number"
+                                min={100}
+                                max={50000}
+                                {...register("radius")}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Latitude (Optional)</label>
+                            <Input
+                                placeholder="e.g. -6.2088"
+                                {...register("lat")}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Longitude (Optional)</label>
+                            <Input
+                                placeholder="e.g. 106.8456"
+                                {...register("lon")}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex gap-6">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                {...register("fast_mode")}
+                                className="h-4 w-4 rounded border-gray-300"
+                            />
+                            <span className="text-sm">Fast Mode</span>
+                        </label>
+
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                {...register("extract_email")}
+                                className="h-4 w-4 rounded border-gray-300"
+                            />
+                            <span className="text-sm">Extract Emails</span>
+                        </label>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {error && (
+                <div className="flex items-center gap-2 p-3 rounded-md bg-destructive/10 text-destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    {error}
+                </div>
+            )}
+
+            {success && (
+                <div className="flex items-center gap-2 p-3 rounded-md bg-green-500/10 text-green-600">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Job created successfully! Redirecting...
+                </div>
+            )}
+
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => reset()}>Reset</Button>
+                <Button type="button" variant="outline" onClick={() => navigate("/jobs")}>
+                    Cancel
+                </Button>
                 <Button type="submit" disabled={isSubmitting}>
                     {isSubmitting ? "Creating..." : "Create Job"}
                 </Button>
