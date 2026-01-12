@@ -177,6 +177,10 @@ func (r *JobRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Job,
 
 // List retrieves jobs with optional filtering
 func (r *JobRepository) List(ctx context.Context, params domain.JobListParams) ([]*domain.Job, int, error) {
+	// Add timeout to prevent long running queries from blocking connection pool
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	var conditions []string
 	var args []interface{}
 	argIdx := 1

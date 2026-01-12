@@ -72,6 +72,10 @@ func (r *WorkerRepository) GetByID(ctx context.Context, id string) (*domain.Work
 
 // List retrieves all workers
 func (r *WorkerRepository) List(ctx context.Context, params domain.WorkerListParams) ([]*domain.Worker, error) {
+	// Add timeout
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	query := `
 		SELECT
 			w.id, w.hostname, w.status, w.current_job_id,

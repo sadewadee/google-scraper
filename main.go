@@ -44,19 +44,7 @@ func main() {
 
 	log.Printf("RunMode: %d (Manager=%v, Worker=%v, Web=%v)", cfg.RunMode, cfg.ManagerMode, cfg.WorkerMode, cfg.WebRunner)
 
-	runnerInstance, err := runnerFactory(cfg)
-	if err != nil {
-		cancel()
-		os.Stderr.WriteString(err.Error() + "\n")
-
-		runner.Telemetry().Close()
-
-		os.Exit(1)
-	}
-
-	egroup, ctx := errgroup.WithContext(ctx)
-
-	// Start ProxyGate if enabled
+	var pg *proxygate.ProxyGate
 	if cfg.ProxyGateEnabled {
 		pgCfg := &proxygate.Config{
 			Enabled:              true,
@@ -71,8 +59,23 @@ func main() {
 			pgCfg.ListenAddr = cfg.ProxyGateAddr
 		}
 
-		pg := proxygate.New(pgCfg)
+		pg = proxygate.New(pgCfg)
+	}
 
+	runnerInstance, err := runnerFactory(cfg, pg)
+	if err != nil {
+		cancel()
+		os.Stderr.WriteString(err.Error() + "\n")
+
+		runner.Telemetry().Close()
+
+		os.Exit(1)
+	}
+
+	egroup, ctx := errgroup.WithContext(ctx)
+
+	// Start ProxyGate if enabled
+	if pg != nil {
 		egroup.Go(func() error {
 			return pg.Run(ctx)
 		})
@@ -98,7 +101,7 @@ func main() {
 	os.Exit(0)
 }
 
-func runnerFactory(cfg *runner.Config) (runner.Runner, error) {
+func runnerFactory(cfg *runner.Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 	switch cfg.RunMode {
 	case runner.RunModeFile:
 		return filerunner.New(cfg)
@@ -118,7 +121,7 @@ func runnerFactory(cfg *runner.Config) (runner.Runner, error) {
 			Address:      cfg.Addr,
 			DataFolder:   cfg.DataFolder,
 			StaticFolder: cfg.StaticFolder,
-		})
+		}, pg)
 	case runner.RunModeWorker:
 		return workerrunner.New(&workerrunner.Config{
 			ManagerURL:   cfg.ManagerURL,

@@ -56,6 +56,10 @@ func (f *Fetcher) fetchAll(ctx context.Context) error {
 	return nil
 }
 
+func (f *Fetcher) ForceRefresh(ctx context.Context) error {
+	return f.fetchAll(ctx)
+}
+
 func (f *Fetcher) fetchOne(ctx context.Context, url string) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

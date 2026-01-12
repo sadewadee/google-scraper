@@ -19,6 +19,7 @@ import (
 	"github.com/sadewadee/google-scraper/internal/api/handlers"
 	"github.com/sadewadee/google-scraper/internal/domain"
 	"github.com/sadewadee/google-scraper/internal/heartbeat"
+	"github.com/sadewadee/google-scraper/internal/proxygate"
 	"github.com/sadewadee/google-scraper/internal/repository/postgres"
 	"github.com/sadewadee/google-scraper/internal/repository/sqlite"
 	"github.com/sadewadee/google-scraper/internal/service"
@@ -54,10 +55,11 @@ type ManagerRunner struct {
 	resultSvc *service.ResultService
 	statsSvc  *service.StatsService
 	hbMonitor *heartbeat.Monitor
+	proxyGate *proxygate.ProxyGate
 }
 
 // New creates a new ManagerRunner
-func New(cfg *Config) (runner.Runner, error) {
+func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 	log.Println("manager: starting initialization...")
 
 	// Default address
@@ -150,9 +152,10 @@ func New(cfg *Config) (runner.Runner, error) {
 	jobHandler := handlers.NewJobHandler(jobSvc, resultSvc)
 	workerHandler := handlers.NewWorkerHandler(workerSvc)
 	statsHandler := handlers.NewStatsHandler(statsSvc)
+	proxyHandler := handlers.NewProxyHandler(pg)
 
 	// Setup router
-	router := api.NewRouter(jobHandler, workerHandler, statsHandler)
+	router := api.NewRouter(jobHandler, workerHandler, statsHandler, proxyHandler)
 	apiToken := os.Getenv("API_TOKEN")
 	if apiToken == "" {
 		apiToken = os.Getenv("API_KEY")
@@ -227,6 +230,7 @@ func New(cfg *Config) (runner.Runner, error) {
 		resultSvc: resultSvc,
 		statsSvc:  statsSvc,
 		hbMonitor: hbMonitor,
+		proxyGate: pg,
 	}, nil
 }
 

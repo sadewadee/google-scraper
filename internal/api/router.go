@@ -12,6 +12,7 @@ type Router struct {
 	jobs    *handlers.JobHandler
 	workers *handlers.WorkerHandler
 	stats   *handlers.StatsHandler
+	proxy   *handlers.ProxyHandler
 }
 
 // NewRouter creates a new Router
@@ -19,12 +20,14 @@ func NewRouter(
 	jobs *handlers.JobHandler,
 	workers *handlers.WorkerHandler,
 	stats *handlers.StatsHandler,
+	proxy *handlers.ProxyHandler,
 ) *Router {
 	return &Router{
 		mux:     http.NewServeMux(),
 		jobs:    jobs,
 		workers: workers,
 		stats:   stats,
+		proxy:   proxy,
 	}
 }
 
@@ -36,6 +39,11 @@ func (r *Router) Setup(token string) http.Handler {
 
 	// Stats endpoint
 	r.mux.HandleFunc("/api/v2/stats", r.stats.GetDashboardStats)
+
+	// ProxyGate endpoints
+	r.mux.HandleFunc("/api/v2/proxygate/stats", r.proxy.GetStats)
+	r.mux.HandleFunc("/api/v2/proxygate/sources", r.handleProxySources)
+	r.mux.HandleFunc("/api/v2/proxygate/refresh", r.proxy.Refresh)
 
 	// Job endpoints
 	r.mux.HandleFunc("/api/v2/jobs", r.handleJobs)
@@ -99,6 +107,18 @@ func (r *Router) handleWorker(w http.ResponseWriter, req *http.Request) {
 		r.workers.GetByID(w, req)
 	case http.MethodDelete:
 		r.workers.Unregister(w, req)
+	default:
+		handlers.RenderError(w, http.StatusMethodNotAllowed, "Method not allowed")
+	}
+}
+
+// handleProxySources routes requests for /api/v2/proxygate/sources
+func (r *Router) handleProxySources(w http.ResponseWriter, req *http.Request) {
+	switch req.Method {
+	case http.MethodGet:
+		r.proxy.GetSources(w, req)
+	case http.MethodPost:
+		r.proxy.AddSource(w, req)
 	default:
 		handlers.RenderError(w, http.StatusMethodNotAllowed, "Method not allowed")
 	}

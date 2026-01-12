@@ -38,3 +38,17 @@ func (pg *ProxyGate) Run(ctx context.Context) error {
 
 	return egroup.Wait()
 }
+
+func (pg *ProxyGate) Refresh(ctx context.Context) error {
+	return pg.fetcher.ForceRefresh(ctx)
+}
+
+func (pg *ProxyGate) GetStats() (int, int) {
+	// total, healthy
+	// For now assume all in pool are healthy
+	return pg.pool.Size(), pg.pool.Size()
+}
+
+func (pg *ProxyGate) GetSources() []string {
+	return pg.fetcher.sources
+}
