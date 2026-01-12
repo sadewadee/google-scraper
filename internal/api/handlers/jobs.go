@@ -57,34 +57,44 @@ func (h *JobHandler) SubmitResults(w http.ResponseWriter, r *http.Request) {
 
 	id, err := parseJobID(r)
 	if err != nil {
+		log.Printf("[SubmitResults] Invalid job ID: %v", err)
 		RenderError(w, http.StatusBadRequest, "Invalid job ID")
 		return
 	}
+
+	log.Printf("[SubmitResults] Receiving results for job %s", id)
 
 	// Limit request body size to prevent memory exhaustion
 	r.Body = http.MaxBytesReader(w, r.Body, MaxResultBatchSize)
 
 	var batch domain.ResultBatch
 	if err := json.NewDecoder(r.Body).Decode(&batch); err != nil {
+		log.Printf("[SubmitResults] Failed to decode request body: %v", err)
 		RenderError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
+	log.Printf("[SubmitResults] Job %s: Received batch with %d results", id, len(batch.Data))
+
 	if batch.JobID != uuid.Nil && batch.JobID != id {
+		log.Printf("[SubmitResults] Job ID mismatch: URL=%s, Body=%s", id, batch.JobID)
 		RenderError(w, http.StatusBadRequest, "Job ID mismatch")
 		return
 	}
 
 	if len(batch.Data) == 0 {
+		log.Printf("[SubmitResults] Job %s: Empty batch, returning 204", id)
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
 	if err := h.results.CreateBatch(r.Context(), id, batch.Data); err != nil {
+		log.Printf("[SubmitResults] Job %s: CreateBatch FAILED: %v", id, err)
 		RenderError(w, http.StatusInternalServerError, "Failed to save results")
 		return
 	}
 
+	log.Printf("[SubmitResults] Job %s: Successfully saved %d results to database", id, len(batch.Data))
 	w.WriteHeader(http.StatusCreated)
 }
 

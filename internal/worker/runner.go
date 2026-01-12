@@ -247,11 +247,17 @@ func (r *Runner) processJob(ctx context.Context, job *domain.Job) (int, error) {
 
 	// Submit results to manager
 	results := memWriter.GetResults()
+	log.Printf("[Worker] Job %s: CSV written, MemoryWriter has %d results", job.ID, len(results))
+
 	if len(results) > 0 {
-		log.Printf("submitting %d results to manager", len(results))
+		log.Printf("[Worker] Job %s: Submitting %d results to manager at %s", job.ID, len(results), r.client.baseURL)
 		if err := r.client.SubmitResults(ctx, job.ID, results); err != nil {
+			log.Printf("[Worker] Job %s: SubmitResults FAILED: %v", job.ID, err)
 			return 0, fmt.Errorf("failed to submit results: %w", err)
 		}
+		log.Printf("[Worker] Job %s: Results submitted successfully", job.ID)
+	} else {
+		log.Printf("[Worker] Job %s: No results in MemoryWriter (check UseInResults)", job.ID)
 	}
 
 	return len(results), nil

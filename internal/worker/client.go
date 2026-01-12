@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -216,16 +217,22 @@ func (c *Client) SubmitResults(ctx context.Context, jobID uuid.UUID, data [][]by
 	}
 
 	url := fmt.Sprintf("/api/v2/jobs/%s/results", jobID.String())
+	log.Printf("[WorkerClient] Submitting %d results to %s%s", len(data), c.baseURL, url)
+
 	resp, err := c.post(ctx, url, batch)
 	if err != nil {
+		log.Printf("[WorkerClient] HTTP request failed: %v", err)
 		return fmt.Errorf("failed to submit results: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("[WorkerClient] SubmitResults failed with status %d: %s", resp.StatusCode, string(body))
 		return c.parseError(resp)
 	}
 
+	log.Printf("[WorkerClient] SubmitResults succeeded with status %d", resp.StatusCode)
 	return nil
 }
 
