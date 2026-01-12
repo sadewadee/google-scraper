@@ -30,6 +30,10 @@ func NewRouter(
 
 // Setup configures all routes
 func (r *Router) Setup(token string) http.Handler {
+	// Health check endpoint (no auth required)
+	r.mux.HandleFunc("/health", r.healthCheck)
+	r.mux.HandleFunc("/api/v2/health", r.healthCheck)
+
 	// Stats endpoint
 	r.mux.HandleFunc("/api/v2/stats", r.stats.GetDashboardStats)
 
@@ -98,4 +102,11 @@ func (r *Router) handleWorker(w http.ResponseWriter, req *http.Request) {
 	default:
 		handlers.RenderError(w, http.StatusMethodNotAllowed, "Method not allowed")
 	}
+}
+
+// healthCheck returns a simple health status (no auth required)
+func (r *Router) healthCheck(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status":"ok"}`))
 }

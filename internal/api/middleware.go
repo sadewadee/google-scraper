@@ -83,8 +83,22 @@ func SecurityHeaders(next http.Handler) http.Handler {
 
 // Auth middleware checks for API token
 func Auth(token string) func(http.Handler) http.Handler {
+	// Paths that don't require authentication
+	publicPaths := []string{
+		"/health",
+		"/api/v2/health",
+	}
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Skip auth for public paths
+			for _, path := range publicPaths {
+				if r.URL.Path == path {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+
 			if token == "" {
 				next.ServeHTTP(w, r)
 				return
