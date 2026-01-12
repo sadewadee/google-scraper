@@ -16,7 +16,14 @@ func NewProxyHandler(pg *proxygate.ProxyGate) *ProxyHandler {
 
 func (h *ProxyHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	if h.pg == nil {
-		RenderError(w, http.StatusNotFound, "ProxyGate not enabled")
+		// Return empty stats if not enabled
+		RenderJSON(w, http.StatusOK, map[string]interface{}{
+			"data": map[string]interface{}{
+				"total_proxies":   0,
+				"healthy_proxies": 0,
+				"last_updated":    "not enabled",
+			},
+		})
 		return
 	}
 
@@ -35,7 +42,10 @@ func (h *ProxyHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 
 func (h *ProxyHandler) GetSources(w http.ResponseWriter, r *http.Request) {
 	if h.pg == nil {
-		RenderError(w, http.StatusNotFound, "ProxyGate not enabled")
+		// Return empty list
+		RenderJSON(w, http.StatusOK, map[string]interface{}{
+			"data": []interface{}{},
+		})
 		return
 	}
 
@@ -58,7 +68,7 @@ func (h *ProxyHandler) GetSources(w http.ResponseWriter, r *http.Request) {
 
 func (h *ProxyHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	if h.pg == nil {
-		RenderError(w, http.StatusNotFound, "ProxyGate not enabled")
+		RenderJSON(w, http.StatusOK, map[string]string{"message": "ProxyGate disabled, ignoring refresh"})
 		return
 	}
 

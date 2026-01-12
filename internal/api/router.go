@@ -43,6 +43,7 @@ func (r *Router) Setup(token string) http.Handler {
 	// ProxyGate endpoints
 	r.mux.HandleFunc("/api/v2/proxygate/stats", r.proxy.GetStats)
 	r.mux.HandleFunc("/api/v2/proxygate/sources", r.handleProxySources)
+	r.mux.HandleFunc("/api/v2/proxygate/sources/{id}", r.handleProxySource)
 	r.mux.HandleFunc("/api/v2/proxygate/refresh", r.proxy.Refresh)
 
 	// Job endpoints
@@ -119,6 +120,18 @@ func (r *Router) handleProxySources(w http.ResponseWriter, req *http.Request) {
 		r.proxy.GetSources(w, req)
 	case http.MethodPost:
 		r.proxy.AddSource(w, req)
+	default:
+		handlers.RenderError(w, http.StatusMethodNotAllowed, "Method not allowed")
+	}
+}
+
+// handleProxySource routes requests for /api/v2/proxygate/sources/{id}
+func (r *Router) handleProxySource(w http.ResponseWriter, req *http.Request) {
+	switch req.Method {
+	case http.MethodDelete:
+		r.proxy.DeleteSource(w, req)
+	case http.MethodPatch:
+		r.proxy.UpdateSource(w, req)
 	default:
 		handlers.RenderError(w, http.StatusMethodNotAllowed, "Method not allowed")
 	}
