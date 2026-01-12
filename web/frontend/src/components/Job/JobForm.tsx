@@ -33,6 +33,7 @@ export function JobForm() {
         handleSubmit,
         formState: { isSubmitting },
         reset,
+        watch,
     } = useForm<FormData>({
         defaultValues: {
             name: "",
@@ -49,6 +50,8 @@ export function JobForm() {
         },
     })
 
+    const isFastMode = watch("fast_mode")
+
     async function onSubmit(data: FormData) {
         setError(null)
         setSuccess(false)
@@ -62,6 +65,14 @@ export function JobForm() {
         if (!data.keywords || data.keywords.trim().length < 3) {
             setError("Enter at least one keyword")
             return
+        }
+
+        // Validate Fast Mode requirements
+        if (data.fast_mode) {
+            if (!data.lat || !data.lon) {
+                setError("Latitude and Longitude are required for Fast Mode")
+                return
+            }
         }
 
         try {
@@ -214,7 +225,7 @@ export function JobForm() {
 
                     <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Latitude (Optional)</label>
+                            <label className="text-sm font-medium">Latitude {isFastMode ? "*" : "(Optional)"}</label>
                             <Input
                                 placeholder="e.g. -6.2088"
                                 {...register("lat")}
@@ -222,7 +233,7 @@ export function JobForm() {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Longitude (Optional)</label>
+                            <label className="text-sm font-medium">Longitude {isFastMode ? "*" : "(Optional)"}</label>
                             <Input
                                 placeholder="e.g. 106.8456"
                                 {...register("lon")}

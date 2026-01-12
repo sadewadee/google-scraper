@@ -17,11 +17,11 @@ export const jobsApi = {
         return response.data
     },
 
-    cancel: async (id: number): Promise<void> => {
+    cancel: async (id: string): Promise<void> => {
         await api.post(`/jobs/${id}/cancel`)
     },
 
-    delete: async (id: number): Promise<void> => {
+    delete: async (id: string): Promise<void> => {
         await api.delete(`/jobs/${id}`)
     }
 }

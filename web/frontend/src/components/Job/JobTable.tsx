@@ -138,7 +138,7 @@ export function JobTable() {
                                                     variant="ghost"
                                                     size="icon"
                                                     title="Cancel"
-                                                    onClick={() => cancelMutation.mutate(Number(job.id))}
+                                                    onClick={() => cancelMutation.mutate(job.id)}
                                                     disabled={cancelMutation.isPending}
                                                 >
                                                     <XCircle className="h-4 w-4" />
@@ -150,7 +150,7 @@ export function JobTable() {
                                                 size="icon"
                                                 className="text-destructive hover:text-destructive"
                                                 title="Delete"
-                                                onClick={() => deleteMutation.mutate(Number(job.id))}
+                                                onClick={() => deleteMutation.mutate(job.id)}
                                                 disabled={deleteMutation.isPending}
                                             >
                                                 <Trash2 className="h-4 w-4" />
