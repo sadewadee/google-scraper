@@ -27,6 +27,8 @@ func main() {
 
 	runner.Banner()
 
+	log.Println("Starting application...")
+
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
@@ -39,6 +41,8 @@ func main() {
 	}()
 
 	cfg := runner.ParseConfig()
+
+	log.Printf("RunMode: %d (Manager=%v, Worker=%v, Web=%v)", cfg.RunMode, cfg.ManagerMode, cfg.WorkerMode, cfg.WebRunner)
 
 	runnerInstance, err := runnerFactory(cfg)
 	if err != nil {

@@ -51,6 +51,14 @@ func New(svc *Service, addr string) (*Server, error) {
 	mux := http.NewServeMux()
 
 	mux.Handle("/static/", http.StripPrefix("/static/", fileServer))
+
+	// Health check endpoint
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"ok"}`))
+	})
+
 	mux.HandleFunc("/scrape", ans.scrape)
 	mux.HandleFunc("/download", func(w http.ResponseWriter, r *http.Request) {
 		r = requestWithID(r)
