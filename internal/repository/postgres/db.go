@@ -3,6 +3,7 @@ package postgres
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"net/url"
 	"strings"
 	"time"
@@ -12,6 +13,8 @@ import (
 
 // OpenConnection opens a PostgreSQL connection
 func OpenConnection(dsn string) (*sql.DB, error) {
+	log.Printf("[DB] Opening PostgreSQL connection...")
+
 	// Try to parse and re-encode the DSN to handle special characters in password
 	parsedDSN, err := sanitizeDSN(dsn)
 	if err != nil {
@@ -21,17 +24,24 @@ func OpenConnection(dsn string) (*sql.DB, error) {
 
 	db, err := sql.Open("pgx", parsedDSN)
 	if err != nil {
+		log.Printf("[DB] Failed to open database: %v", err)
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
+	log.Printf("[DB] Pinging database...")
+	pingStart := time.Now()
 	if err := db.Ping(); err != nil {
+		log.Printf("[DB] Ping failed after %v: %v", time.Since(pingStart), err)
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
+	log.Printf("[DB] Ping successful in %v", time.Since(pingStart))
 
 	// Connection pool settings
 	db.SetMaxOpenConns(100)
 	db.SetMaxIdleConns(25)
 	db.SetConnMaxLifetime(5 * time.Minute)
+
+	log.Printf("[DB] Connection pool configured: maxOpen=100, maxIdle=25, maxLifetime=5m")
 
 	return db, nil
 }

@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -113,6 +115,9 @@ type CreateJobRequest struct {
 
 // Create handles POST /api/v2/jobs
 func (h *JobHandler) Create(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	log.Printf("[JobHandler] Create request received")
+
 	if r.Method != http.MethodPost {
 		RenderError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
@@ -123,6 +128,8 @@ func (h *JobHandler) Create(w http.ResponseWriter, r *http.Request) {
 		RenderError(w, http.StatusBadRequest, "Invalid request body: "+err.Error())
 		return
 	}
+
+	log.Printf("[JobHandler] Request decoded in %v: name=%s, keywords=%d", time.Since(start), req.Name, len(req.Keywords))
 
 	// Validate required fields
 	if req.Name == "" {
@@ -168,12 +175,16 @@ func (h *JobHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Priority:     req.Priority,
 	}
 
+	log.Printf("[JobHandler] Calling service.Create")
+	serviceStart := time.Now()
 	job, err := h.jobs.Create(r.Context(), domainReq)
 	if err != nil {
-		RenderError(w, http.StatusInternalServerError, "Failed to create job: "+err.Error())
+		log.Printf("[JobHandler] Create FAILED after %v (service: %v): %v", time.Since(start), time.Since(serviceStart), err)
+		RenderError(w, http.StatusInternalServerError, "Failed to create job")
 		return
 	}
 
+	log.Printf("[JobHandler] Create completed in %v (service: %v)", time.Since(start), time.Since(serviceStart))
 	RenderJSON(w, http.StatusCreated, job)
 }
 

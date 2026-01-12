@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -35,12 +37,19 @@ func NewJobService(jobs domain.JobRepository, results domain.ResultRepository) *
 
 // Create creates a new job
 func (s *JobService) Create(ctx context.Context, req *domain.CreateJobRequest) (*domain.Job, error) {
-	job := req.ToJob()
+	start := time.Now()
+	log.Printf("[JobService] Create started for job: %s", req.Name)
 
+	job := req.ToJob()
+	log.Printf("[JobService] ToJob completed in %v", time.Since(start))
+
+	dbStart := time.Now()
 	if err := s.jobs.Create(ctx, job); err != nil {
+		log.Printf("[JobService] Create FAILED after %v: %v", time.Since(start), err)
 		return nil, fmt.Errorf("failed to create job: %w", err)
 	}
 
+	log.Printf("[JobService] Create completed in %v (db: %v)", time.Since(start), time.Since(dbStart))
 	return job, nil
 }
 

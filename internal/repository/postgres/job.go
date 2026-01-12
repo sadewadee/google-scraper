@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -104,6 +105,9 @@ func NewJobRepository(db *sql.DB) *JobRepository {
 
 // Create creates a new job
 func (r *JobRepository) Create(ctx context.Context, job *domain.Job) error {
+	start := time.Now()
+	log.Printf("[JobRepo] Create started for job ID: %s", job.ID)
+
 	// Add timeout to fail fast
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -124,6 +128,7 @@ func (r *JobRepository) Create(ctx context.Context, job *domain.Job) error {
 		)
 	`
 
+	execStart := time.Now()
 	_, err := r.db.ExecContext(ctx, query,
 		job.ID, job.Name, job.Status, job.Priority,
 		pq.Array(job.Config.Keywords), job.Config.Lang, job.Config.GeoLat, job.Config.GeoLon,
@@ -133,7 +138,13 @@ func (r *JobRepository) Create(ctx context.Context, job *domain.Job) error {
 		job.CreatedAt, job.UpdatedAt,
 	)
 
-	return err
+	if err != nil {
+		log.Printf("[JobRepo] Create FAILED after %v (exec: %v): %v", time.Since(start), time.Since(execStart), err)
+		return err
+	}
+
+	log.Printf("[JobRepo] Create completed in %v (exec: %v)", time.Since(start), time.Since(execStart))
+	return nil
 }
 
 // GetByID retrieves a job by ID
