@@ -3,7 +3,9 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -63,7 +65,8 @@ func (h *ProxyHandler) GetSources(w http.ResponseWriter, r *http.Request) {
 	if h.repo != nil {
 		sources, err := h.repo.List(r.Context())
 		if err != nil {
-			RenderError(w, http.StatusInternalServerError, err.Error())
+			log.Printf("Failed to list proxy sources: %v", err)
+			RenderError(w, http.StatusInternalServerError, "Failed to list proxy sources")
 			return
 		}
 
@@ -107,7 +110,8 @@ func (h *ProxyHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.pg.Refresh(r.Context()); err != nil {
-		RenderError(w, http.StatusInternalServerError, err.Error())
+		log.Printf("Failed to refresh proxies: %v", err)
+		RenderError(w, http.StatusInternalServerError, "Failed to refresh proxies")
 		return
 	}
 
@@ -134,6 +138,12 @@ func (h *ProxyHandler) AddSource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate URL format
+	if _, err := url.ParseRequestURI(req.URL); err != nil {
+		RenderError(w, http.StatusBadRequest, "Invalid URL format")
+		return
+	}
+
 	// Persist
 	var id int64
 	var createdAt time.Time
@@ -141,7 +151,8 @@ func (h *ProxyHandler) AddSource(w http.ResponseWriter, r *http.Request) {
 	if h.repo != nil {
 		source, err := h.repo.Create(r.Context(), req.URL)
 		if err != nil {
-			RenderError(w, http.StatusInternalServerError, err.Error())
+			log.Printf("Failed to create proxy source: %v", err)
+			RenderError(w, http.StatusInternalServerError, "Failed to create proxy source")
 			return
 		}
 		id = source.ID
@@ -154,8 +165,14 @@ func (h *ProxyHandler) AddSource(w http.ResponseWriter, r *http.Request) {
 	// Add to memory
 	h.pg.AddSource(req.URL)
 
-	// Trigger refresh in background
-	go h.pg.Refresh(context.Background())
+	// Trigger refresh in background with timeout
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := h.pg.Refresh(ctx); err != nil {
+			log.Printf("Background proxy refresh failed: %v", err)
+		}
+	}()
 
 	RenderJSON(w, http.StatusCreated, map[string]interface{}{
 		"id":         id,
@@ -191,7 +208,8 @@ func (h *ProxyHandler) DeleteSource(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := h.repo.Delete(r.Context(), id); err != nil {
-			RenderError(w, http.StatusInternalServerError, err.Error())
+			log.Printf("Failed to delete proxy source: %v", err)
+			RenderError(w, http.StatusInternalServerError, "Failed to delete proxy source")
 			return
 		}
 

@@ -210,18 +210,7 @@ func (c *Client) Unregister(ctx context.Context) error {
 
 // SubmitResults submits results to the manager
 func (c *Client) SubmitResults(ctx context.Context, jobID uuid.UUID, data [][]byte) error {
-	// Encode data as base64 or send as JSON array of bytes?
-	// The body will be JSON: { "data": [ "base64encoded", ... ] } or just array of objects if data is json
-	// But data here is [][]byte.
-	// Let's assume data is already JSON bytes or CSV rows.
-	// To keep it simple, we'll send a struct
-
-	type ResultBatch struct {
-		JobID uuid.UUID `json:"job_id"`
-		Data  [][]byte  `json:"data"`
-	}
-
-	batch := ResultBatch{
+	batch := domain.ResultBatch{
 		JobID: jobID,
 		Data:  data,
 	}
@@ -233,7 +222,7 @@ func (c *Client) SubmitResults(ctx context.Context, jobID uuid.UUID, data [][]by
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		return c.parseError(resp)
 	}
 

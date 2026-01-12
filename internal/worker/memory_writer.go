@@ -29,9 +29,11 @@ func (w *MemoryWriter) Run(ctx context.Context, in <-chan scrapemate.Result) err
 	return nil
 }
 
-// GetResults returns the stored results
+// GetResults returns a copy of the stored results
 func (w *MemoryWriter) GetResults() [][]byte {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	return w.Results
+	result := make([][]byte, len(w.Results))
+	copy(result, w.Results)
+	return result
 }

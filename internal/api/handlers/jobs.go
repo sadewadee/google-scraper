@@ -43,11 +43,8 @@ type JobHandler struct {
 	results ResultServiceInterface
 }
 
-// ResultBatch represents a batch of results
-type ResultBatch struct {
-	JobID uuid.UUID `json:"job_id"`
-	Data  [][]byte  `json:"data"`
-}
+// MaxResultBatchSize is the maximum size of a result batch (10MB)
+const MaxResultBatchSize = 10 << 20
 
 // SubmitResults handles POST /api/v2/jobs/{id}/results
 func (h *JobHandler) SubmitResults(w http.ResponseWriter, r *http.Request) {
@@ -62,9 +59,12 @@ func (h *JobHandler) SubmitResults(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var batch ResultBatch
+	// Limit request body size to prevent memory exhaustion
+	r.Body = http.MaxBytesReader(w, r.Body, MaxResultBatchSize)
+
+	var batch domain.ResultBatch
 	if err := json.NewDecoder(r.Body).Decode(&batch); err != nil {
-		RenderError(w, http.StatusBadRequest, "Invalid request body: "+err.Error())
+		RenderError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -74,12 +74,12 @@ func (h *JobHandler) SubmitResults(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(batch.Data) == 0 {
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
 	if err := h.results.CreateBatch(r.Context(), id, batch.Data); err != nil {
-		RenderError(w, http.StatusInternalServerError, "Failed to save results: "+err.Error())
+		RenderError(w, http.StatusInternalServerError, "Failed to save results")
 		return
 	}
 
