@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"strings"
@@ -13,6 +14,83 @@ import (
 
 	"github.com/sadewadee/google-scraper/internal/domain"
 )
+
+// IntervalDuration is a custom type that can scan PostgreSQL INTERVAL into time.Duration
+type IntervalDuration time.Duration
+
+// Scan implements the sql.Scanner interface
+func (d *IntervalDuration) Scan(value interface{}) error {
+	if value == nil {
+		*d = 0
+		return nil
+	}
+
+	switch v := value.(type) {
+	case int64:
+		// Already in nanoseconds (shouldn't happen with INTERVAL, but just in case)
+		*d = IntervalDuration(v)
+		return nil
+	case string:
+		// PostgreSQL interval format: "HH:MM:SS" or "HH:MM:SS.microseconds"
+		return d.parseInterval(v)
+	case []byte:
+		// PostgreSQL might return as bytes
+		return d.parseInterval(string(v))
+	default:
+		return fmt.Errorf("cannot scan type %T into IntervalDuration", value)
+	}
+}
+
+// parseInterval parses PostgreSQL interval string format (HH:MM:SS)
+func (d *IntervalDuration) parseInterval(s string) error {
+	// Handle empty string
+	if s == "" {
+		*d = 0
+		return nil
+	}
+
+	// Try parsing as duration first (e.g., "10m", "1h30m")
+	if dur, err := time.ParseDuration(s); err == nil {
+		*d = IntervalDuration(dur)
+		return nil
+	}
+
+	// Parse HH:MM:SS format
+	parts := strings.Split(s, ":")
+	if len(parts) != 3 {
+		return fmt.Errorf("invalid interval format: %s", s)
+	}
+
+	var hours, minutes int
+	var seconds float64
+
+	if _, err := fmt.Sscanf(parts[0], "%d", &hours); err != nil {
+		return fmt.Errorf("invalid hours in interval: %s", s)
+	}
+	if _, err := fmt.Sscanf(parts[1], "%d", &minutes); err != nil {
+		return fmt.Errorf("invalid minutes in interval: %s", s)
+	}
+	if _, err := fmt.Sscanf(parts[2], "%f", &seconds); err != nil {
+		return fmt.Errorf("invalid seconds in interval: %s", s)
+	}
+
+	total := time.Duration(hours)*time.Hour +
+		time.Duration(minutes)*time.Minute +
+		time.Duration(seconds*float64(time.Second))
+
+	*d = IntervalDuration(total)
+	return nil
+}
+
+// Value implements the driver.Valuer interface
+func (d IntervalDuration) Value() (driver.Value, error) {
+	// Convert to PostgreSQL interval format for storage
+	dur := time.Duration(d)
+	hours := int(dur.Hours())
+	minutes := int(dur.Minutes()) % 60
+	seconds := int(dur.Seconds()) % 60
+	return fmt.Sprintf("%02d:%02d:%02d", hours, minutes, seconds), nil
+}
 
 // JobRepository implements domain.JobRepository for PostgreSQL
 type JobRepository struct {
@@ -46,7 +124,7 @@ func (r *JobRepository) Create(ctx context.Context, job *domain.Job) error {
 		job.ID, job.Name, job.Status, job.Priority,
 		pq.Array(job.Config.Keywords), job.Config.Lang, job.Config.GeoLat, job.Config.GeoLon,
 		job.Config.Zoom, job.Config.Radius, job.Config.Depth,
-		job.Config.FastMode, job.Config.ExtractEmail, job.Config.MaxTime, pq.Array(job.Config.Proxies),
+		job.Config.FastMode, job.Config.ExtractEmail, IntervalDuration(job.Config.MaxTime), pq.Array(job.Config.Proxies),
 		job.Progress.TotalPlaces, job.Progress.ScrapedPlaces, job.Progress.FailedPlaces,
 		job.CreatedAt, job.UpdatedAt,
 	)
@@ -70,7 +148,7 @@ func (r *JobRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Job,
 
 	job := &domain.Job{}
 	var keywords, proxies pq.StringArray
-	var maxTime time.Duration
+	var maxTime IntervalDuration
 
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&job.ID, &job.Name, &job.Status, &job.Priority,
@@ -91,7 +169,7 @@ func (r *JobRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Job,
 
 	job.Config.Keywords = keywords
 	job.Config.Proxies = proxies
-	job.Config.MaxTime = maxTime
+	job.Config.MaxTime = time.Duration(maxTime)
 	job.Progress.CalculatePercentage()
 
 	return job, nil
@@ -172,7 +250,7 @@ func (r *JobRepository) List(ctx context.Context, params domain.JobListParams) (
 	for rows.Next() {
 		job := &domain.Job{}
 		var keywords, proxies pq.StringArray
-		var maxTime time.Duration
+		var maxTime IntervalDuration
 
 		err := rows.Scan(
 			&job.ID, &job.Name, &job.Status, &job.Priority,
@@ -189,7 +267,7 @@ func (r *JobRepository) List(ctx context.Context, params domain.JobListParams) (
 
 		job.Config.Keywords = keywords
 		job.Config.Proxies = proxies
-		job.Config.MaxTime = maxTime
+		job.Config.MaxTime = time.Duration(maxTime)
 		job.Progress.CalculatePercentage()
 
 		jobs = append(jobs, job)
@@ -216,7 +294,7 @@ func (r *JobRepository) Update(ctx context.Context, job *domain.Job) error {
 		job.ID, job.Name, job.Status, job.Priority,
 		pq.Array(job.Config.Keywords), job.Config.Lang, job.Config.GeoLat, job.Config.GeoLon,
 		job.Config.Zoom, job.Config.Radius, job.Config.Depth,
-		job.Config.FastMode, job.Config.ExtractEmail, job.Config.MaxTime, pq.Array(job.Config.Proxies),
+		job.Config.FastMode, job.Config.ExtractEmail, IntervalDuration(job.Config.MaxTime), pq.Array(job.Config.Proxies),
 		job.Progress.TotalPlaces, job.Progress.ScrapedPlaces, job.Progress.FailedPlaces,
 		job.WorkerID, job.StartedAt, job.CompletedAt,
 		job.ErrorMessage,
