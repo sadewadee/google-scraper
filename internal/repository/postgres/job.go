@@ -177,8 +177,8 @@ func (r *JobRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Job,
 
 // List retrieves jobs with optional filtering
 func (r *JobRepository) List(ctx context.Context, params domain.JobListParams) ([]*domain.Job, int, error) {
-	// Add timeout to prevent long running queries from blocking connection pool
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	// Add aggressive timeout to fail fast instead of 504
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	var conditions []string
@@ -203,11 +203,28 @@ func (r *JobRepository) List(ctx context.Context, params domain.JobListParams) (
 	}
 
 	// Count query
-	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM jobs_queue %s", whereClause)
-	var total int
+	var countQuery string
+
+	// Optimization: Use approximate row count if no filters are applied
+	// This avoids slow COUNT(*) on large tables
+	if len(conditions) == 0 {
+		countQuery = "SELECT reltuples::bigint FROM pg_class WHERE relname = 'jobs_queue'"
+	} else {
+		countQuery = fmt.Sprintf("SELECT COUNT(*) FROM jobs_queue %s", whereClause)
+	}
+
+	var total int64 // Use int64 for potentially large estimates
 	err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
 	if err != nil {
-		return nil, 0, err
+		// Fallback to standard count if estimation fails (e.g., table not analyzed yet)
+		if len(conditions) == 0 {
+			countQuery = "SELECT COUNT(*) FROM jobs_queue"
+			if err := r.db.QueryRowContext(ctx, countQuery).Scan(&total); err != nil {
+				return nil, 0, err
+			}
+		} else {
+			return nil, 0, err
+		}
 	}
 
 	// Order
@@ -277,7 +294,7 @@ func (r *JobRepository) List(ctx context.Context, params domain.JobListParams) (
 		jobs = append(jobs, job)
 	}
 
-	return jobs, total, rows.Err()
+	return jobs, int(total), rows.Err()
 }
 
 // Update updates a job
