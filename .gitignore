@@ -63,6 +63,7 @@ gmaps.db
 
 # Data folders
 results/
+!web/frontend/src/components/Results/
 webdata/
 cache/
 

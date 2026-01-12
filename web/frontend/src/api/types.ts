@@ -90,3 +90,69 @@ export interface ProxySource {
     status?: 'ok' | 'error'
     error_message?: string
 }
+
+// Result entry from Google Maps scraping (matches gmaps.Entry in Go)
+export interface ResultEntry {
+    input_id: string
+    link: string
+    cid: string
+    title: string
+    categories: string[]
+    category: string
+    address: string
+    open_hours: Record<string, string[]>
+    popular_times: Record<string, Record<number, number>>
+    web_site: string
+    phone: string
+    plus_code: string
+    review_count: number
+    review_rating: number
+    reviews_per_rating: Record<number, number>
+    latitude: number
+    longtitude: number // Note: typo matches backend
+    status: string
+    description: string
+    reviews_link: string
+    thumbnail: string
+    timezone: string
+    price_range: string
+    data_id: string
+    place_id: string
+    images: { title: string; image: string }[]
+    reservations: { link: string; source: string }[]
+    order_online: { link: string; source: string }[]
+    menu: { link: string; source: string }
+    owner: { id: string; name: string; link: string }
+    complete_address: {
+        borough: string
+        street: string
+        city: string
+        postal_code: string
+        state: string
+        country: string
+    }
+    about: {
+        id: string
+        name: string
+        options: { name: string; enabled: boolean }[]
+    }[]
+    user_reviews: {
+        name: string
+        profile_picture: string
+        rating: number
+        description: string
+        images: string[]
+        when: string
+    }[]
+    emails: string[]
+}
+
+export interface ResultsResponse {
+    data: ResultEntry[]
+    meta: {
+        page: number
+        per_page: number
+        total: number
+        total_pages: number
+    }
+}

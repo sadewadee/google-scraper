@@ -1,5 +1,5 @@
 import { api } from "./client"
-import type { Job, JobCreatePayload, ApiResponse } from "./types"
+import type { Job, JobCreatePayload, ApiResponse, ResultsResponse } from "./types"
 
 export const jobsApi = {
     getAll: async (): Promise<ApiResponse<Job[]>> => {
@@ -23,5 +23,21 @@ export const jobsApi = {
 
     delete: async (id: string): Promise<void> => {
         await api.delete(`/jobs/${id}`)
+    },
+
+    getResults: async (id: string, page = 1, perPage = 50): Promise<ResultsResponse> => {
+        const response = await api.get<ResultsResponse>(`/jobs/${id}/results`, {
+            params: { page, per_page: perPage }
+        })
+        return response.data
+    },
+
+    downloadResults: (id: string, format: 'csv' | 'json', columns?: string[]): string => {
+        const baseUrl = api.defaults.baseURL || '/api/v2'
+        const params = new URLSearchParams({ format })
+        if (columns && columns.length > 0) {
+            params.set('columns', columns.join(','))
+        }
+        return `${baseUrl}/jobs/${id}/download?${params.toString()}`
     }
 }

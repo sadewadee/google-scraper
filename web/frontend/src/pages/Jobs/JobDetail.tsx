@@ -2,7 +2,8 @@ import { useParams, Link } from "react-router-dom"
 import { Button } from "@/components/UI/Button"
 import { Badge } from "@/components/UI/Badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/UI/Card"
-import { ArrowLeft, Download, Clock, MapPin } from "lucide-react"
+import { ArrowLeft, Clock, MapPin } from "lucide-react"
+import { ResultsTable } from "@/components/Results/ResultsTable"
 
 import { useQuery } from "@tanstack/react-query"
 import { jobsApi } from "@/api/jobs"
@@ -38,16 +39,6 @@ export default function JobDetail() {
                         </h2>
                         <p className="text-muted-foreground">Created on {new Date(job.created_at).toLocaleDateString()}</p>
                     </div>
-                </div>
-                <div className="flex gap-2">
-                    <Button variant="outline">
-                        <Download className="mr-2 h-4 w-4" />
-                        Export CSV
-                    </Button>
-                    <Button variant="outline">
-                        <Download className="mr-2 h-4 w-4" />
-                        Export JSON
-                    </Button>
                 </div>
             </div>
 
@@ -111,15 +102,13 @@ export default function JobDetail() {
                 </Card>
             </div>
 
-            {/* Results Table Placeholder */}
+            {/* Results Table */}
             <Card>
                 <CardHeader>
                     <CardTitle>Scraped Results</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="rounded-md border p-8 text-center text-muted-foreground">
-                        Results table will be rendered here.
-                    </div>
+                    <ResultsTable jobId={id!} />
                 </CardContent>
             </Card>
         </div>
