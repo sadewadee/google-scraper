@@ -40,6 +40,7 @@ export interface JobCreatePayload {
     fast_mode: boolean
     extract_email: boolean
     priority: number
+    max_time: number
     lat?: number
     lon?: number
 }

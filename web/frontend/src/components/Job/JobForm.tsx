@@ -21,6 +21,7 @@ interface FormData {
     fast_mode: boolean
     extract_email: boolean
     priority: number
+    max_time: number
 }
 
 export function JobForm() {
@@ -47,10 +48,17 @@ export function JobForm() {
             fast_mode: false,
             extract_email: false,
             priority: 5,
+            max_time: 600, // 10 minutes
         },
     })
 
     const isFastMode = watch("fast_mode")
+    const isExtractEmail = watch("extract_email")
+    const lat = watch("lat")
+    const lon = watch("lon")
+
+    // Check if form is ready for submission (especially for Fast Mode)
+    const isReady = !isFastMode || (isFastMode && lat && lon)
 
     async function onSubmit(data: FormData) {
         setError(null)
@@ -98,6 +106,7 @@ export function JobForm() {
                 fast_mode: data.fast_mode,
                 extract_email: data.extract_email,
                 priority: data.priority,
+                max_time: data.max_time,
             }
 
             // Add lat/lon if provided
@@ -183,6 +192,16 @@ export function JobForm() {
                             <p className="text-xs text-muted-foreground">Higher = processed first</p>
                         </div>
                     </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">Max Time (seconds)</label>
+                        <Input
+                            type="number"
+                            min={180}
+                            {...register("max_time", { valueAsNumber: true })}
+                        />
+                        <p className="text-xs text-muted-foreground">Minimum 180 seconds (3 minutes)</p>
+                    </div>
                 </CardContent>
             </Card>
 
@@ -225,40 +244,56 @@ export function JobForm() {
 
                     <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Latitude {isFastMode ? "*" : "(Optional)"}</label>
+                            <label className="text-sm font-medium">Latitude {isFastMode && <span className="text-destructive">*</span>}</label>
                             <Input
                                 placeholder="e.g. -6.2088"
                                 {...register("lat")}
+                                className={isFastMode && (!lat || lat.length === 0) ? "border-destructive" : ""}
                             />
+                            {isFastMode && !lat && <p className="text-xs text-destructive">Required for Fast Mode</p>}
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Longitude {isFastMode ? "*" : "(Optional)"}</label>
+                            <label className="text-sm font-medium">Longitude {isFastMode && <span className="text-destructive">*</span>}</label>
                             <Input
                                 placeholder="e.g. 106.8456"
                                 {...register("lon")}
+                                className={isFastMode && (!lon || lon.length === 0) ? "border-destructive" : ""}
                             />
+                            {isFastMode && !lon && <p className="text-xs text-destructive">Required for Fast Mode</p>}
                         </div>
                     </div>
 
-                    <div className="flex gap-6">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                {...register("fast_mode")}
-                                className="h-4 w-4 rounded border-gray-300"
-                            />
-                            <span className="text-sm">Fast Mode</span>
-                        </label>
+                    <div className="flex flex-col gap-4">
+                        <div className="flex gap-6">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    {...register("fast_mode")}
+                                    className="h-4 w-4 rounded border-gray-300"
+                                />
+                                <span className="text-sm font-medium">Fast Mode</span>
+                            </label>
 
-                        <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                {...register("extract_email")}
-                                className="h-4 w-4 rounded border-gray-300"
-                            />
-                            <span className="text-sm">Extract Emails</span>
-                        </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    {...register("extract_email")}
+                                    className="h-4 w-4 rounded border-gray-300"
+                                />
+                                <span className="text-sm font-medium">Extract Emails</span>
+                            </label>
+                        </div>
+                        {isFastMode && (
+                            <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-md">
+                                <p><strong>Fast Mode enabled:</strong> Latitude and Longitude are required. The scraper will simulate a search from that specific location.</p>
+                            </div>
+                        )}
+                        {isExtractEmail && (
+                            <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-md">
+                                <p><strong>Email Extraction enabled:</strong> This process takes longer. Ensure Max Time is sufficient.</p>
+                            </div>
+                        )}
                     </div>
                 </CardContent>
             </Card>
@@ -281,7 +316,7 @@ export function JobForm() {
                 <Button type="button" variant="outline" onClick={() => navigate("/jobs")}>
                     Cancel
                 </Button>
-                <Button type="submit" disabled={isSubmitting}>
+                <Button type="submit" disabled={isSubmitting || !isReady}>
                     {isSubmitting ? "Creating..." : "Create Job"}
                 </Button>
             </div>
