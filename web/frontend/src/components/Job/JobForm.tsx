@@ -1,30 +1,25 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import * as z from "zod"
 import { Button } from "@/components/UI/Button"
 import { Input } from "@/components/UI/Input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/UI/Card"
-import { cn } from "@/lib/utils"
 import { jobsApi } from "@/api/jobs"
 import { AlertCircle, CheckCircle2 } from "lucide-react"
 
-const formSchema = z.object({
-    name: z.string().min(1, "Job name is required"),
-    keywords: z.string().min(3, "Enter at least one keyword"),
-    lang: z.string().default("en"),
-    lat: z.string().optional(),
-    lon: z.string().optional(),
-    zoom: z.coerce.number().min(1).max(21).default(15),
-    radius: z.coerce.number().min(100).max(50000).default(10000),
-    depth: z.coerce.number().min(1).max(100).default(10),
-    fast_mode: z.boolean().default(false),
-    extract_email: z.boolean().default(false),
-    priority: z.coerce.number().min(0).max(10).default(5),
-})
-
-type FormData = z.infer<typeof formSchema>
+interface FormData {
+    name: string
+    keywords: string
+    lang: string
+    lat: string
+    lon: string
+    zoom: number
+    radius: number
+    depth: number
+    fast_mode: boolean
+    extract_email: boolean
+    priority: number
+}
 
 export function JobForm() {
     const navigate = useNavigate()
@@ -34,10 +29,9 @@ export function JobForm() {
     const {
         register,
         handleSubmit,
-        formState: { errors, isSubmitting },
+        formState: { isSubmitting },
         reset,
     } = useForm<FormData>({
-        resolver: zodResolver(formSchema),
         defaultValues: {
             name: "",
             keywords: "",
@@ -56,6 +50,17 @@ export function JobForm() {
     async function onSubmit(data: FormData) {
         setError(null)
         setSuccess(false)
+
+        // Validate required fields
+        if (!data.name || data.name.trim().length === 0) {
+            setError("Job name is required")
+            return
+        }
+
+        if (!data.keywords || data.keywords.trim().length < 3) {
+            setError("Enter at least one keyword")
+            return
+        }
 
         try {
             // Parse keywords from comma-separated or newline-separated string
@@ -116,11 +121,7 @@ export function JobForm() {
                         <Input
                             placeholder="e.g. Coffee Shops Jakarta"
                             {...register("name")}
-                            className={cn(errors.name && "border-destructive")}
                         />
-                        {errors.name && (
-                            <p className="text-sm text-destructive">{errors.name.message}</p>
-                        )}
                     </div>
 
                     <div className="space-y-2">
@@ -129,14 +130,8 @@ export function JobForm() {
                             placeholder="Enter keywords (one per line or comma-separated)&#10;e.g. coffee shop jakarta&#10;restaurant bandung"
                             {...register("keywords")}
                             rows={4}
-                            className={cn(
-                                "flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
-                                errors.keywords && "border-destructive"
-                            )}
+                            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                         />
-                        {errors.keywords && (
-                            <p className="text-sm text-destructive">{errors.keywords.message}</p>
-                        )}
                         <p className="text-xs text-muted-foreground">
                             Enter search queries for Google Maps. Each keyword will be scraped separately.
                         </p>
@@ -166,7 +161,7 @@ export function JobForm() {
                                 type="number"
                                 min={0}
                                 max={10}
-                                {...register("priority")}
+                                {...register("priority", { valueAsNumber: true })}
                             />
                             <p className="text-xs text-muted-foreground">Higher = processed first</p>
                         </div>
@@ -186,11 +181,8 @@ export function JobForm() {
                                 type="number"
                                 min={1}
                                 max={100}
-                                {...register("depth")}
+                                {...register("depth", { valueAsNumber: true })}
                             />
-                            {errors.depth && (
-                                <p className="text-sm text-destructive">{errors.depth.message}</p>
-                            )}
                         </div>
 
                         <div className="space-y-2">
@@ -199,7 +191,7 @@ export function JobForm() {
                                 type="number"
                                 min={1}
                                 max={21}
-                                {...register("zoom")}
+                                {...register("zoom", { valueAsNumber: true })}
                             />
                         </div>
 
@@ -209,7 +201,7 @@ export function JobForm() {
                                 type="number"
                                 min={100}
                                 max={50000}
-                                {...register("radius")}
+                                {...register("radius", { valueAsNumber: true })}
                             />
                         </div>
                     </div>
