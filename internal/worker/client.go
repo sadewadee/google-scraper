@@ -20,17 +20,23 @@ type Client struct {
 	baseURL    string
 	workerID   string
 	hostname   string
+	apiToken   string
 	httpClient *http.Client
 }
 
 // NewClient creates a new worker client
 func NewClient(baseURL, workerID string) *Client {
 	hostname, _ := os.Hostname()
+	apiToken := os.Getenv("API_TOKEN")
+	if apiToken == "" {
+		apiToken = os.Getenv("API_KEY")
+	}
 
 	return &Client{
 		baseURL:  baseURL,
 		workerID: workerID,
 		hostname: hostname,
+		apiToken: apiToken,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
@@ -185,6 +191,10 @@ func (c *Client) Unregister(ctx context.Context) error {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
+	if c.apiToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiToken)
+	}
+
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
@@ -222,6 +232,9 @@ func (c *Client) post(ctx context.Context, path string, body interface{}) (*http
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	if c.apiToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiToken)
+	}
 
 	return c.httpClient.Do(req)
 }

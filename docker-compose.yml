@@ -144,6 +144,7 @@ services:
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-gmaps}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-gmaps_secret}
+      - API_TOKEN=${API_TOKEN}
     volumes:
       - worker_data:/data
       - ./results:/results
