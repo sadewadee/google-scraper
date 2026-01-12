@@ -201,6 +201,7 @@ services:
 volumes:
   postgres_data:
     driver: local
+    # Data persists across redeploys. Only deleted with: docker volume rm
   scraper_data:
     driver: local
   manager_data:
