@@ -40,15 +40,8 @@ func OpenConnection(dsn string) (*sql.DB, error) {
 
 // RunMigrations runs embedded migrations
 func RunMigrations(db *sql.DB) error {
-	// Create migrations tracking table if not exists (handled in 0001 but needed for check)
-	// Actually 0001 creates it. But we need to check if we can run 0001.
-    // So we'll let the first run always try to create it if we check existence first?
-    // Or just run the SQL commands.
+	// Create migrations tracking table if not exists
 
-    // But wait, if I use the same logic as managerrunner, I need to check schema_migrations table.
-    // But if table doesn't exist, query fails.
-
-    // Let's just create the migrations table first explicitly in code
     _, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS schema_migrations (
 			version TEXT PRIMARY KEY,
