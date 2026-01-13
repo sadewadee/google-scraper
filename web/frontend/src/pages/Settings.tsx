@@ -3,8 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/UI/Input"
 import { useForm } from "react-hook-form"
 
+interface SettingsFormData {
+    apiKey: string
+    maxConcurrent: number
+    proxyRotation: boolean
+}
+
 export default function Settings() {
-    const { register, handleSubmit } = useForm({
+    const { register, handleSubmit } = useForm<SettingsFormData>({
         defaultValues: {
             apiKey: "****************",
             maxConcurrent: 5,
@@ -12,7 +18,7 @@ export default function Settings() {
         }
     })
 
-    const onSubmit = (data: any) => {
+    const onSubmit = (data: SettingsFormData) => {
         console.log(data)
         alert("Settings saved!")
     }

@@ -158,7 +158,11 @@ func (r *fileRunner) setWriters() error {
 
 		r.writers = append(r.writers, customWriter)
 	case r.cfg.LeadsDBAPIKey != "":
-		r.writers = append(r.writers, leadsdb.New(r.cfg.LeadsDBAPIKey))
+		writer, err := leadsdb.New(r.cfg.LeadsDBAPIKey)
+		if err != nil {
+			return err
+		}
+		r.writers = append(r.writers, writer)
 	default:
 		var resultsWriter io.Writer
 

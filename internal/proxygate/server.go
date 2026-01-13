@@ -30,29 +30,19 @@ func NewServer(addr string, pool *Pool) *Server {
 
 func (s *Server) Run(ctx context.Context) error {
 	socks5.Debug = true
-	// We use socks5.NewClassicServer just to validate config if needed,
-	// but we don't actually use the server instance because we want custom handling.
-	// srv, _ := socks5.NewClassicServer(s.addr, "", "", "", 0, 0)
-
-	go func() {
-		<-ctx.Done()
-	}()
 
 	log.Printf("[ProxyGate] SOCKS5 server listening on %s", s.addr)
-
-	// We can't easily replace the Handle method in the struct provided by this library
-	// without reimplementing ListenAndServe or using a different library.
-	// However, we can use the library's built-in TCP/UDP handling which is robust.
-	// The library doesn't easily support dynamic upstream selection per request *inside* its standard handler.
-
-	// Let's implement a custom listener loop using the library's components but our own Accept loop
-	// to allow using our custom handleConnection.
 
 	l, err := net.Listen("tcp", s.addr)
 	if err != nil {
 		return err
 	}
-	defer l.Close()
+
+	// Close listener when context is done
+	go func() {
+		<-ctx.Done()
+		l.Close()
+	}()
 
 	for {
 		conn, err := l.Accept()
@@ -67,6 +57,7 @@ func (s *Server) Run(ctx context.Context) error {
 		}
 
 		go func(c net.Conn) {
+			defer c.Close()
 			if err := s.handleConnection(c); err != nil {
 				// verbose logging only
 			}

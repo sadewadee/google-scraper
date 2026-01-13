@@ -2,6 +2,7 @@ package gmaps
 
 import (
 	"context"
+	"regexp"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -83,7 +84,8 @@ func (j *EmailExtractJob) Process(ctx context.Context, resp *scrapemate.Response
 		emails = regexEmailExtractor(resp.Body)
 	}
 
-	j.Entry.Emails = emails
+	// Filter out placeholder/protected emails
+	j.Entry.Emails = filterInvalidEmails(emails)
 
 	return j.Entry, nil, nil
 }
@@ -140,4 +142,70 @@ func getValidEmail(s string) (string, error) {
 	}
 
 	return email.String(), nil
+}
+
+// invalidEmailPatterns contains regex patterns for emails that should be filtered out
+var invalidEmailPatterns = []*regexp.Regexp{
+	// Wix protection/sentry emails
+	regexp.MustCompile(`@sentry\.wixpress\.com$`),
+	regexp.MustCompile(`@sentry-next\.wixpress\.com$`),
+	// Placeholder/example domains
+	regexp.MustCompile(`@example\.(com|org|net)$`),
+	regexp.MustCompile(`@domain\.com$`),
+	regexp.MustCompile(`@mydomain\.com$`),
+	regexp.MustCompile(`@yoursite\.com$`),
+	regexp.MustCompile(`@yourcompany\.com$`),
+	regexp.MustCompile(`@yourdomain\.com$`),
+	regexp.MustCompile(`@sample\.com$`),
+	regexp.MustCompile(`@test\.com$`),
+	regexp.MustCompile(`@website\.com$`),
+	regexp.MustCompile(`@email\.com$`),
+	// No-reply patterns
+	regexp.MustCompile(`^noreply@`),
+	regexp.MustCompile(`^no-reply@`),
+	regexp.MustCompile(`^donotreply@`),
+	regexp.MustCompile(`^do-not-reply@`),
+	// UUID-like local parts (32+ hex chars)
+	regexp.MustCompile(`^[a-f0-9]{32,}@`),
+	// WordPress/CMS generic addresses
+	regexp.MustCompile(`@wordpress\.com$`),
+	regexp.MustCompile(`^admin@`),
+	regexp.MustCompile(`^webmaster@`),
+	// Image file extensions (false positives from parsing)
+	regexp.MustCompile(`\.(png|jpg|jpeg|gif|svg|webp)$`),
+}
+
+// filterInvalidEmails removes placeholder, protected, and invalid emails
+func filterInvalidEmails(emails []string) []string {
+	var valid []string
+
+	for _, email := range emails {
+		if isValidBusinessEmail(email) {
+			valid = append(valid, email)
+		}
+	}
+
+	return valid
+}
+
+// isValidBusinessEmail checks if an email is a valid business email
+func isValidBusinessEmail(email string) bool {
+	email = strings.ToLower(strings.TrimSpace(email))
+
+	// Check against all invalid patterns
+	for _, pattern := range invalidEmailPatterns {
+		if pattern.MatchString(email) {
+			return false
+		}
+	}
+
+	// Check for other suspicious patterns
+	// Emails with 'sentry', 'placeholder', 'test' in domain
+	if strings.Contains(email, "@sentry.") ||
+		strings.Contains(email, "placeholder") ||
+		strings.Contains(email, "@test.") {
+		return false
+	}
+
+	return true
 }

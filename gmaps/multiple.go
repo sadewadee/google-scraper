@@ -65,14 +65,14 @@ func ParseSearchResults(raw []byte) ([]*Entry, error) {
 		}()
 
 		entry.Latitude = getNthElementAndCast[float64](business, 9, 2)
-		entry.Longtitude = getNthElementAndCast[float64](business, 9, 3)
+		entry.Longitude = getNthElementAndCast[float64](business, 9, 3)
 		entry.Phone = strings.ReplaceAll(getNthElementAndCast[string](business, 178, 0, 0), " ", "")
 		entry.OpenHours = getHours(business)
 		entry.Status = getNthElementAndCast[string](business, 34, 4, 4)
 		entry.Timezone = getNthElementAndCast[string](business, 30)
 		entry.DataID = getNthElementAndCast[string](business, 10)
 
-		entry.PlusCode = olc.Encode(entry.Latitude, entry.Longtitude, 10)
+		entry.PlusCode = olc.Encode(entry.Latitude, entry.Longitude, 10)
 
 		entries = append(entries, &entry)
 	}

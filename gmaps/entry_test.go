@@ -47,7 +47,7 @@ func Test_EntryFromJSON(t *testing.T) {
 		ReviewCount:  396,
 		ReviewRating: 4.2,
 		Latitude:     34.670595399999996,
-		Longtitude:   33.042456699999995,
+		Longitude:   33.042456699999995,
 		Cid:          "16519582940102929223",
 		Status:       "Closed ⋅ Opens 12:30\u202fpm Tue",
 		ReviewsLink:  "https://search.google.com/local/reviews?placeid=ChIJDdnwdv0y5xQRRytw1ihZQeU&q=Kipriakon&authuser=0&hl=en&gl=CY",

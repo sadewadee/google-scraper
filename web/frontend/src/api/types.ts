@@ -109,7 +109,7 @@ export interface ResultEntry {
     review_rating: number
     reviews_per_rating: Record<number, number>
     latitude: number
-    longtitude: number // Note: typo matches backend
+    longitude: number
     status: string
     description: string
     reviews_link: string

@@ -14,20 +14,20 @@ import (
 	"github.com/sadewadee/google-scraper/gmaps"
 )
 
-func New(apiKey string) scrapemate.ResultWriter {
+func New(apiKey string) (scrapemate.ResultWriter, error) {
 	if apiKey == "" {
 		apiKey = os.Getenv("LEADSDB_API_KEY")
 	}
 
 	if apiKey == "" {
-		panic("LEADSDB_API_KEY environment variable or apiKey parameter not set")
+		return nil, errors.New("LEADSDB_API_KEY environment variable or apiKey parameter not set")
 	}
 
 	ans := leadsDBWriter{
 		client: leadsdb.New(apiKey),
 	}
 
-	return &ans
+	return &ans, nil
 }
 
 type leadsDBWriter struct {
@@ -119,9 +119,9 @@ func convertToLead(entry *gmaps.Entry) (*leadsdb.Lead, error) {
 	}
 
 	// Set coordinates if available
-	if entry.Latitude != 0 || entry.Longtitude != 0 {
+	if entry.Latitude != 0 || entry.Longitude != 0 {
 		lead.Latitude = leadsdb.Ptr(entry.Latitude)
-		lead.Longitude = leadsdb.Ptr(entry.Longtitude)
+		lead.Longitude = leadsdb.Ptr(entry.Longitude)
 	}
 
 	// Set rating if available

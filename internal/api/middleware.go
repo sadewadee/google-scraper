@@ -82,7 +82,12 @@ func SecurityHeaders(next http.Handler) http.Handler {
 }
 
 // Auth middleware checks for API token
+// WARNING: If token is empty, authentication is DISABLED
 func Auth(token string) func(http.Handler) http.Handler {
+	if token == "" {
+		log.Println("WARNING: API_TOKEN is not set - authentication is DISABLED. Set API_TOKEN environment variable for production use.")
+	}
+
 	// Paths that don't require authentication
 	publicPaths := []string{
 		"/health",

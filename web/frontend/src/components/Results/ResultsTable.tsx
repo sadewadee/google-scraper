@@ -154,10 +154,10 @@ const AVAILABLE_COLUMNS: ColumnDef[] = [
         render: (e) => <span className="text-sm font-mono">{e.latitude?.toFixed(6) || "-"}</span>,
     },
     {
-        key: "longtitude",
+        key: "longitude",
         label: "Longitude",
         defaultVisible: false,
-        render: (e) => <span className="text-sm font-mono">{e.longtitude?.toFixed(6) || "-"}</span>,
+        render: (e) => <span className="text-sm font-mono">{e.longitude?.toFixed(6) || "-"}</span>,
     },
     {
         key: "place_id",
@@ -214,12 +214,13 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
     })
 
     // Filter results based on search
+    const dataToFilter = data?.data
     const filteredResults = useMemo(() => {
-        if (!data?.data) return []
-        if (!search.trim()) return data.data
+        if (!dataToFilter) return []
+        if (!search.trim()) return dataToFilter
 
         const searchLower = search.toLowerCase()
-        return data.data.filter((entry) => {
+        return dataToFilter.filter((entry) => {
             return (
                 entry.title?.toLowerCase().includes(searchLower) ||
                 entry.address?.toLowerCase().includes(searchLower) ||
@@ -229,7 +230,7 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
                 entry.emails?.some((e) => e.toLowerCase().includes(searchLower))
             )
         })
-    }, [data?.data, search])
+    }, [dataToFilter, search])
 
     const totalPages = data?.meta?.total_pages || 1
     const total = data?.meta?.total || 0

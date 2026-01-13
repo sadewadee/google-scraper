@@ -254,7 +254,7 @@ func getGlobalAvailableColumns() map[string]func(e *gmaps.Entry) string {
 		"Rating":          func(e *gmaps.Entry) string { return fmt.Sprintf("%.1f", e.ReviewRating) },
 		"Reviews":         func(e *gmaps.Entry) string { return fmt.Sprintf("%d", e.ReviewCount) },
 		"Latitude":        func(e *gmaps.Entry) string { return fmt.Sprintf("%f", e.Latitude) },
-		"Longitude":       func(e *gmaps.Entry) string { return fmt.Sprintf("%f", e.Longtitude) },
+		"Longitude":       func(e *gmaps.Entry) string { return fmt.Sprintf("%f", e.Longitude) },
 		"Place ID":        func(e *gmaps.Entry) string { return e.PlaceID },
 		"Google Maps URL": func(e *gmaps.Entry) string { return e.Link },
 		"Description":     func(e *gmaps.Entry) string { return e.Description },

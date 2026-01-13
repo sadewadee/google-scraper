@@ -22,8 +22,8 @@ func NewPool() *Pool {
 }
 
 func (p *Pool) GetNext() (string, error) {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
 	if len(p.proxies) == 0 {
 		return "", errors.New("no healthy proxies available")
