@@ -91,111 +91,52 @@ The scraper has [built-in LeadsDB integration](#export-to-leadsdb) - just add yo
 
 ---
 
-## Table of Contents
+## Operation Modes
 
-- [Quick Start](#quick-start)
-  - [Web UI](#web-ui)
-  - [Command Line](#command-line)
-  - [REST API](#rest-api)
-- [Installation](#installation)
-- [Features](#features)
-- [Extracted Data Points](#extracted-data-points)
-- [Configuration](#configuration)
-  - [Command Line Options](#command-line-options)
-  - [Using Proxies](#using-proxies)
-  - [Email Extraction](#email-extraction)
-  - [Fast Mode](#fast-mode)
-- [Advanced Usage](#advanced-usage)
-  - [PostgreSQL Database Provider](#postgresql-database-provider)
-  - [Kubernetes Deployment](#kubernetes-deployment)
-  - [Custom Writer Plugins](#custom-writer-plugins)
-  - [Export to LeadsDB](#export-to-leadsdb)
-- [Performance](#performance)
-- [Support the Project](#support-the-project)
-- [Sponsors](#sponsors)
-- [Community](#community)
-- [Contributing](#contributing)
-- [License](#license)
+| Mode | Flag | Description |
+|------|------|-------------|
+| **Manager** | `-manager` | API server + Web UI (no scraping) - **RECOMMENDED** |
+| **Worker** | `-worker` | Scraper that connects to Manager via Redis |
+| CLI (deprecated) | `-input` | Input file → Output file |
+| Web UI (deprecated) | `-web` | Local dashboard with SQLite |
+| Distributed (deprecated) | `-dsn` | PostgreSQL-coordinated instances |
+| Serverless | `-aws-lambda` | AWS Lambda deployment |
 
----
-
-## Quick Start
-
-### Docker Compose (Recommended)
-
-The easiest way to run the full stack (Manager + Worker + Database):
+### Recommended Architecture (Manager/Worker)
 
 ```bash
-# 1. Start the stack
-docker compose up -d
+# Manager (API + Dashboard)
+./gmaps-scraper -manager -dsn 'postgres://...' -redis-addr localhost:6379 -addr :8080
 
-# 2. Open Web UI
-open http://localhost:8080
+# Worker (can run multiple instances)
+./gmaps-scraper -worker -manager-url http://localhost:8080 -redis-addr localhost:6379
+
+# Docker Compose (starts postgres, redis, manager, worker)
+docker-compose up -d
+docker-compose up -d --scale worker=4  # Scale to 4 workers
 ```
 
-This starts:
-- **Manager**: Web UI & API (Port 8080)
-- **Worker**: Scraper instance (Auto-connected)
-- **Database**: PostgreSQL (Port 5432)
+## Key Configuration Flags
 
-### Manual Run (No Docker)
-
-You can run the manager with SQLite support directly:
-
-```bash
-# 1. Build
-go build -o gmaps
-
-# 2. Run Manager (uses local gmaps.db)
-./gmaps -manager
-
-# 3. Open Web UI
-open http://localhost:8080
-
-# 4. Run Worker (in a separate terminal)
-./gmaps -worker -manager-url http://localhost:8080 -c 4
-```
-
----
-
-## Architecture
-
-This project uses a **Manager-Worker** architecture:
-
-- **Manager**: Handles the Web UI, API, Job Queue, and Database interactions.
-- **Worker**: Fetches jobs from the Manager, performs scraping, and submits results back.
-- **Database**: PostgreSQL (Production) or SQLite (Single-node).
-
-### Authentication
-
-Secure your API/UI by setting the `API_TOKEN` environment variable:
-
-```bash
-export API_TOKEN="your-secret-token"
-./gmaps -manager
-```
-
-Or in `docker-compose.yml`:
-
-```yaml
-manager:
-  environment:
-    - API_TOKEN=your-secret-token
-```
-
-When enabled, all API requests require `Authorization: Bearer <token>` or `X-API-Key: <token>`.
-
----
-
-## Features
-
-| Feature | Description |
-|---------|-------------|
-| **ProxyGate** | Built-in proxy manager with auto-rotation and health checks |
-| **Microservices** | Scalable Worker nodes that can be distributed across machines |
-| **Modern UI** | Neumorphism design with Real-time Dashboard (React + Tailwind) |
-| **Dynamic Export** | Customizable CSV columns |
-| **33+ Data Points** | Business name, address, phone, website, reviews, coordinates, and more |
+| Flag | Description |
+|------|-------------|
+| `-manager` | Run as Manager (API + Web UI) |
+| `-worker` | Run as Worker (connects to Manager) |
+| `-manager-url` | Manager API URL for worker mode |
+| `-redis-addr` | Redis address for job queue |
+| `-dsn` | PostgreSQL connection string |
+| `-input` | Input file with queries |
+| `-results` | Output file path |
+| `-c` | Concurrency level |
+| `-depth` | Scroll depth for results |
+| `-lang` | Language code |
+| `-geo` | Geo-coordinates |
+| `-zoom` | Map zoom level |
+| `-radius` | Search radius |
+| `-json` | JSON output format |
+| `-email` | Enable email crawling |
+| `-extra-reviews` | Collect detailed reviews |
+| `-proxies` | HTTP/SOCKS5 proxy list |
 
 ---
 

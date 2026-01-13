@@ -66,7 +66,7 @@ Click **Deploy** dan tunggu build selesai.
 
 ## Modes
 
-### Mode 1: Web UI Only (Default)
+### Mode 1: Manager (API + Web UI) - Recommended
 
 ```bash
 # Sudah termasuk di docker-compose.yml default
@@ -87,7 +87,7 @@ docker compose --profile distributed up -d
 docker compose --profile distributed up -d --scale worker=5
 ```
 
-### Mode 3: CLI Only (One-off Job)
+### Mode 3: CLI Only (Deprecated)
 
 ```bash
 # Run single scrape job

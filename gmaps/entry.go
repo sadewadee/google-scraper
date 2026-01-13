@@ -76,7 +76,7 @@ type Entry struct {
 	ReviewRating        float64                `json:"review_rating"`
 	ReviewsPerRating    map[int]int            `json:"reviews_per_rating"`
 	Latitude            float64                `json:"latitude"`
-	Longtitude          float64                `json:"longtitude"`
+	Longitude          float64                `json:"longitude"`
 	Status              string                 `json:"status"`
 	Description         string                 `json:"description"`
 	ReviewsLink         string                 `json:"reviews_link"`
@@ -104,7 +104,7 @@ func (e *Entry) haversineDistance(lat, lon float64) float64 {
 	clon := lon * math.Pi / 180
 
 	elat := e.Latitude * math.Pi / 180
-	elon := e.Longtitude * math.Pi / 180
+	elon := e.Longitude * math.Pi / 180
 
 	dlat := elat - clat
 	dlon := elon - clon
@@ -219,7 +219,7 @@ func (e *Entry) CsvRow() []string {
 		stringify(e.ReviewRating),
 		stringify(e.ReviewsPerRating),
 		stringify(e.Latitude),
-		stringify(e.Longtitude),
+		stringify(e.Longitude),
 		e.Cid,
 		e.Status,
 		e.Description,
@@ -343,7 +343,7 @@ func EntryFromJSON(raw []byte, reviewCountOnly ...bool) (entry Entry, err error)
 	entry.PlusCode = getNthElementAndCast[string](darray, 183, 2, 2, 0)
 	entry.ReviewRating = getNthElementAndCast[float64](darray, 4, 7)
 	entry.Latitude = getNthElementAndCast[float64](darray, 9, 2)
-	entry.Longtitude = getNthElementAndCast[float64](darray, 9, 3)
+	entry.Longitude = getNthElementAndCast[float64](darray, 9, 3)
 	entry.Cid = getNthElementAndCast[string](jd, 25, 3, 0, 13, 0, 0, 1)
 	entry.Status = getNthElementAndCast[string](darray, 34, 4, 4)
 	entry.Description = getNthElementAndCast[string](darray, 32, 1, 1)

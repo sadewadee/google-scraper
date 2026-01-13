@@ -48,7 +48,7 @@ Copy your proxy credentials and test the connection. Make note of your proxy for
 
 ### Step 5: Configure Google Maps Scraper
 
-Now use your Decodo proxy credentials with the Google Maps Scraper:
+Now use your Decodo proxy credentials with the Google Maps Scraper. We recommend using the **Manager** mode for production use, but here's how to use it with the CLI for testing:
 
 ```bash
 ./google-maps-scraper \
@@ -73,7 +73,7 @@ Now use your Decodo proxy credentials with the Google Maps Scraper:
 
 ### HTTP Proxy
 ```bash
--proxies 'http://your_username:your_password@isp.decodo.com:'
+-proxies 'http://your_username:your_password@isp.decodo.com:10001'
 ```
 
 ### HTTPS Proxy
@@ -100,16 +100,16 @@ Here's a complete walkthrough from setup to scraping with Decodo proxies:
 1. **Prepare your queries file** (`example-queries.txt`):
 ```
 restaurants in New York
-hotels in London  
+hotels in London
 coffee shops in Tokyo
 ```
 
 2. **Get your Decodo proxy details** from your dashboard:
 - Username: `your_username`
-- Password: `your_password` 
+- Password: `your_password`
 - Endpoint: `host:port`
 
-3. **Run the scraper with Decodo proxy**:
+3. **Run the scraper with Decodo proxy** (CLI Mode for testing):
 ```bash
 # Basic scraping with Decodo proxy
 ./google-maps-scraper \

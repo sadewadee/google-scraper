@@ -17,7 +17,7 @@ type PlaceJobOptions func(*PlaceJob)
 type PlaceJob struct {
 	scrapemate.Job
 
-	UsageInResultststs  bool
+	UsageInResults      bool
 	ExtractEmail        bool
 	ExitMonitor         exiter.Exiter
 	ExtractExtraReviews bool
@@ -41,7 +41,7 @@ func NewPlaceJob(parentID, langCode, u string, extractEmail, extraExtraReviews b
 		},
 	}
 
-	job.UsageInResultststs = true
+	job.UsageInResults = true
 	job.ExtractEmail = extractEmail
 	job.ExtractExtraReviews = extraExtraReviews
 
@@ -102,7 +102,7 @@ func (j *PlaceJob) Process(_ context.Context, resp *scrapemate.Response) (any, [
 
 		emailJob := NewEmailJob(j.ID, &entry, opts...)
 
-		j.UsageInResultststs = false
+		j.UsageInResults = false
 
 		return nil, []scrapemate.IJob{emailJob}, nil
 	} else if j.ExitMonitor != nil {
@@ -264,7 +264,7 @@ func (j *PlaceJob) getReviewCount(data []byte) int {
 }
 
 func (j *PlaceJob) UseInResults() bool {
-	return j.UsageInResultststs
+	return j.UsageInResults
 }
 
 const js = `
