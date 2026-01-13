@@ -74,6 +74,9 @@ type ResultRepository interface {
 	// CreateBatch creates multiple results in a batch
 	CreateBatch(ctx context.Context, jobID uuid.UUID, data [][]byte) error
 
+	// ListAll retrieves all results with pagination (global view)
+	ListAll(ctx context.Context, limit, offset int) ([][]byte, int, error)
+
 	// ListByJobID retrieves results for a job with pagination
 	ListByJobID(ctx context.Context, jobID uuid.UUID, limit, offset int) ([][]byte, int, error)
 

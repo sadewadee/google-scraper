@@ -68,6 +68,36 @@ func (r *ResultRepository) CreateBatch(ctx context.Context, jobID uuid.UUID, dat
 	return nil
 }
 
+// ListAll retrieves all results with pagination (global view)
+func (r *ResultRepository) ListAll(ctx context.Context, limit, offset int) ([][]byte, int, error) {
+	// First get total count
+	countQuery := `SELECT COUNT(*) FROM results`
+	var total int
+	err := r.db.QueryRowContext(ctx, countQuery).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Get results
+	query := `SELECT data FROM results ORDER BY id DESC LIMIT ? OFFSET ?`
+	rows, err := r.db.QueryContext(ctx, query, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var results [][]byte
+	for rows.Next() {
+		var dataStr string
+		if err := rows.Scan(&dataStr); err != nil {
+			return nil, 0, err
+		}
+		results = append(results, []byte(dataStr))
+	}
+
+	return results, total, rows.Err()
+}
+
 // ListByJobID retrieves results for a job with pagination
 func (r *ResultRepository) ListByJobID(ctx context.Context, jobID uuid.UUID, limit, offset int) ([][]byte, int, error) {
 	// First get total count

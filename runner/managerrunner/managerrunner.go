@@ -184,6 +184,7 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 	workerHandler := handlers.NewWorkerHandler(workerSvc)
 	statsHandler := handlers.NewStatsHandler(statsSvc)
 	proxyHandler := handlers.NewProxyHandler(pg, proxyRepo)
+	resultHandler := handlers.NewResultHandler(resultSvc)
 
 	// Load sources if proxyRepo is available
 	if proxyRepo != nil && pg != nil {
@@ -210,7 +211,7 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 	}
 
 	// Setup router
-	router := api.NewRouter(jobHandler, workerHandler, statsHandler, proxyHandler)
+	router := api.NewRouter(jobHandler, workerHandler, statsHandler, proxyHandler, resultHandler)
 	apiToken := os.Getenv("API_TOKEN")
 	if apiToken == "" {
 		apiToken = os.Getenv("API_KEY")

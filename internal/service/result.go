@@ -30,6 +30,11 @@ func (s *ResultService) CreateBatch(ctx context.Context, jobID uuid.UUID, data [
 	return s.results.CreateBatch(ctx, jobID, data)
 }
 
+// ListAll retrieves all results with pagination (global view)
+func (s *ResultService) ListAll(ctx context.Context, limit, offset int) ([][]byte, int, error) {
+	return s.results.ListAll(ctx, limit, offset)
+}
+
 // ListByJobID retrieves results for a job
 func (s *ResultService) ListByJobID(ctx context.Context, jobID uuid.UUID, limit, offset int) ([][]byte, int, error) {
 	return s.results.ListByJobID(ctx, jobID, limit, offset)

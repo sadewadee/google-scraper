@@ -13,6 +13,7 @@ type Router struct {
 	workers *handlers.WorkerHandler
 	stats   *handlers.StatsHandler
 	proxy   *handlers.ProxyHandler
+	results *handlers.ResultHandler
 }
 
 // NewRouter creates a new Router
@@ -21,6 +22,7 @@ func NewRouter(
 	workers *handlers.WorkerHandler,
 	stats *handlers.StatsHandler,
 	proxy *handlers.ProxyHandler,
+	results *handlers.ResultHandler,
 ) *Router {
 	return &Router{
 		mux:     http.NewServeMux(),
@@ -28,6 +30,7 @@ func NewRouter(
 		workers: workers,
 		stats:   stats,
 		proxy:   proxy,
+		results: results,
 	}
 }
 
@@ -66,6 +69,10 @@ func (r *Router) Setup(token string) http.Handler {
 	r.mux.HandleFunc("/api/v2/workers/{id}/complete", r.workers.CompleteJob)
 	r.mux.HandleFunc("/api/v2/workers/{id}/fail", r.workers.FailJob)
 	r.mux.HandleFunc("/api/v2/workers/{id}/release", r.workers.ReleaseJob)
+
+	// Global results endpoints (database view)
+	r.mux.HandleFunc("/api/v2/results", r.results.List)
+	r.mux.HandleFunc("/api/v2/results/download", r.results.Download)
 
 	// Apply middleware
 	return Chain(r.mux,
