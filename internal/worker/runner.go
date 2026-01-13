@@ -16,39 +16,101 @@ import (
 	"github.com/sadewadee/google-scraper/deduper"
 	"github.com/sadewadee/google-scraper/exiter"
 	"github.com/sadewadee/google-scraper/internal/domain"
+	"github.com/sadewadee/google-scraper/internal/queue"
 	"github.com/sadewadee/google-scraper/runner"
 	"github.com/gosom/scrapemate"
 	"github.com/gosom/scrapemate/adapters/writers/csvwriter"
 	"github.com/gosom/scrapemate/scrapemateapp"
 )
 
+// Config holds worker configuration
+type Config struct {
+	ManagerURL   string
+	WorkerID     string
+	RunnerConfig *runner.Config
+	RedisURL     string
+	RedisAddr    string
+	RedisPass    string
+	RedisDB      int
+}
+
 // Runner is a worker that claims and processes jobs from the manager
 type Runner struct {
-	client      *Client
-	config      *runner.Config
-	dataFolder  string
-	currentJob  *domain.Job
-	stopChan    chan struct{}
-	workerID    string
+	client       *Client
+	config       *runner.Config
+	dataFolder   string
+	currentJob   *domain.Job
+	stopChan     chan struct{}
+	workerID     string
+	queueWorker  *queue.Worker
+	useRedis     bool
+	redisDeduper *queue.Deduper
 }
 
 // NewRunner creates a new worker runner
-func NewRunner(managerURL, workerID string, cfg *runner.Config) (*Runner, error) {
-	if cfg.DataFolder == "" {
-		cfg.DataFolder = "."
+func NewRunner(cfg *Config) (*Runner, error) {
+	if cfg.RunnerConfig == nil {
+		cfg.RunnerConfig = &runner.Config{}
 	}
 
-	if err := os.MkdirAll(cfg.DataFolder, os.ModePerm); err != nil {
+	if cfg.RunnerConfig.DataFolder == "" {
+		cfg.RunnerConfig.DataFolder = "."
+	}
+
+	if err := os.MkdirAll(cfg.RunnerConfig.DataFolder, os.ModePerm); err != nil {
 		return nil, err
 	}
 
-	return &Runner{
-		client:     NewClient(managerURL, workerID),
-		config:     cfg,
-		dataFolder: cfg.DataFolder,
-		workerID:   workerID,
+	r := &Runner{
+		client:     NewClient(cfg.ManagerURL, cfg.WorkerID),
+		config:     cfg.RunnerConfig,
+		dataFolder: cfg.RunnerConfig.DataFolder,
+		workerID:   cfg.WorkerID,
 		stopChan:   make(chan struct{}),
-	}, nil
+		useRedis:   false,
+	}
+
+	// Try to set up Redis queue worker and deduper
+	if cfg.RedisURL != "" || cfg.RedisAddr != "" {
+		// Initialize Redis queue worker
+		queueCfg := &queue.WorkerConfig{
+			RedisURL:    cfg.RedisURL,
+			RedisAddr:   cfg.RedisAddr,
+			Password:    cfg.RedisPass,
+			DB:          cfg.RedisDB,
+			Concurrency: 1, // Process one job at a time per worker
+		}
+
+		qw, err := queue.NewWorker(queueCfg, r.handleQueueJob)
+		if err != nil {
+			log.Printf("WARNING: failed to connect to Redis queue: %v", err)
+			log.Println("falling back to HTTP polling mode")
+		} else {
+			r.queueWorker = qw
+			r.useRedis = true
+			log.Println("Redis queue worker initialized")
+		}
+
+		// Initialize Redis deduper for distributed deduplication
+		dedupCfg := &queue.DedupeConfig{
+			RedisURL:  cfg.RedisURL,
+			RedisAddr: cfg.RedisAddr,
+			Password:  cfg.RedisPass,
+			DB:        cfg.RedisDB,
+			Prefix:    "dedup",
+		}
+
+		dedup, err := queue.NewDeduper(dedupCfg)
+		if err != nil {
+			log.Printf("WARNING: failed to connect to Redis deduper: %v", err)
+			log.Println("using local in-memory deduplication")
+		} else {
+			r.redisDeduper = dedup
+			log.Println("Redis distributed deduplication initialized")
+		}
+	}
+
+	return r, nil
 }
 
 // Run starts the worker
@@ -64,13 +126,29 @@ func (r *Runner) Run(ctx context.Context) error {
 	// Start heartbeat goroutine
 	go r.heartbeatLoop(ctx)
 
-	// Main work loop
+	// Use Redis queue if available, otherwise fallback to HTTP polling
+	if r.useRedis && r.queueWorker != nil {
+		log.Println("starting Redis queue worker mode")
+		return r.queueWorker.Run(ctx)
+	}
+
+	log.Println("starting HTTP polling mode")
 	return r.workLoop(ctx)
 }
 
 // Stop gracefully stops the worker
 func (r *Runner) Stop(ctx context.Context) error {
 	close(r.stopChan)
+
+	// Shutdown Redis queue worker if active
+	if r.queueWorker != nil {
+		r.queueWorker.Shutdown()
+	}
+
+	// Close Redis deduper if active
+	if r.redisDeduper != nil {
+		r.redisDeduper.Close()
+	}
 
 	// Release current job if any
 	if r.currentJob != nil {
@@ -85,6 +163,63 @@ func (r *Runner) Stop(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// handleQueueJob is called by the Redis queue worker for each job
+func (r *Runner) handleQueueJob(ctx context.Context, payload *queue.JobPayload) error {
+	log.Printf("received job from Redis queue: %s", payload.JobID)
+
+	// Fetch full job details from manager
+	job, err := r.fetchJobDetails(ctx, payload.JobID)
+	if err != nil {
+		log.Printf("failed to fetch job details: %v", err)
+		return err
+	}
+
+	if job == nil {
+		log.Printf("job %s not found or already completed", payload.JobID)
+		return nil // Not an error, job may have been cancelled
+	}
+
+	r.currentJob = job
+
+	// Process the job
+	placesScraped, err := r.processJob(ctx, job)
+	if err != nil {
+		log.Printf("job failed: %s - %v", job.ID, err)
+		if failErr := r.client.FailJob(ctx, job.ID, err.Error()); failErr != nil {
+			log.Printf("warning: failed to mark job as failed: %v", failErr)
+		}
+		r.currentJob = nil
+		return err
+	}
+
+	log.Printf("job completed: %s (%d places)", job.ID, placesScraped)
+	if completeErr := r.client.CompleteJob(ctx, job.ID, placesScraped); completeErr != nil {
+		log.Printf("warning: failed to mark job as completed: %v", completeErr)
+	}
+
+	r.currentJob = nil
+	return nil
+}
+
+// fetchJobDetails fetches full job details from the manager API
+func (r *Runner) fetchJobDetails(ctx context.Context, jobID uuid.UUID) (*domain.Job, error) {
+	// Use the claim endpoint which both claims and returns job details
+	// The job is already assigned via Redis, so we claim it for this worker
+	job, err := r.client.ClaimJob(ctx)
+	if err != nil {
+		// Try to get job by ID directly if claim fails
+		return nil, err
+	}
+
+	// If the claimed job matches our expected job ID, return it
+	if job != nil && job.ID == jobID {
+		return job, nil
+	}
+
+	// Otherwise, return whatever job was claimed (it should be the same)
+	return job, nil
 }
 
 func (r *Runner) heartbeatLoop(ctx context.Context) {
@@ -186,7 +321,15 @@ func (r *Runner) processJob(ctx context.Context, job *domain.Job) (int, error) {
 		coords = formatCoords(*job.Config.GeoLat, *job.Config.GeoLon)
 	}
 
-	dedup := deduper.New()
+	// Use Redis deduper if available, otherwise use local in-memory deduper
+	var dedup deduper.Deduper
+	if r.redisDeduper != nil {
+		dedup = r.redisDeduper
+		log.Printf("job %s: using Redis distributed deduplication", job.ID)
+	} else {
+		dedup = deduper.New()
+		log.Printf("job %s: using local in-memory deduplication", job.ID)
+	}
 	exitMonitor := exiter.New()
 
 	seedJobs, err := runner.CreateSeedJobs(

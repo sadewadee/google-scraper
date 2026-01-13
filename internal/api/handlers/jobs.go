@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/xuri/excelize/v2"
 
 	"github.com/sadewadee/google-scraper/gmaps"
 	"github.com/sadewadee/google-scraper/internal/domain"
@@ -431,8 +432,10 @@ func (h *JobHandler) DownloadResults(w http.ResponseWriter, r *http.Request) {
 		h.downloadJSON(w, r, id)
 	case "csv":
 		h.downloadCSV(w, r, id)
+	case "xlsx":
+		h.downloadXLSX(w, r, id)
 	default:
-		RenderError(w, http.StatusBadRequest, "Invalid format. Use 'json' or 'csv'")
+		RenderError(w, http.StatusBadRequest, "Invalid format. Use 'json', 'csv', or 'xlsx'")
 	}
 }
 
@@ -465,46 +468,8 @@ func (h *JobHandler) downloadCSV(w http.ResponseWriter, r *http.Request, jobID u
 	w.Header().Set("Content-Type", "text/csv")
 	w.Header().Set("Content-Disposition", "attachment; filename=results-"+jobID.String()+".csv")
 
-	// Define available columns
-	availableColumns := map[string]func(e *gmaps.Entry) string{
-		"Title":           func(e *gmaps.Entry) string { return e.Title },
-		"Address":         func(e *gmaps.Entry) string { return e.Address },
-		"Phone":           func(e *gmaps.Entry) string { return e.Phone },
-		"Website":         func(e *gmaps.Entry) string { return e.WebSite },
-		"Category":        func(e *gmaps.Entry) string { return e.Category },
-		"Rating":          func(e *gmaps.Entry) string { return fmt.Sprintf("%.1f", e.ReviewRating) },
-		"Reviews":         func(e *gmaps.Entry) string { return fmt.Sprintf("%d", e.ReviewCount) },
-		"Latitude":        func(e *gmaps.Entry) string { return fmt.Sprintf("%f", e.Latitude) },
-		"Longitude":       func(e *gmaps.Entry) string { return fmt.Sprintf("%f", e.Longtitude) },
-		"Place ID":        func(e *gmaps.Entry) string { return e.PlaceID },
-		"Google Maps URL": func(e *gmaps.Entry) string { return e.Link },
-		"Description":     func(e *gmaps.Entry) string { return e.Description },
-		"Status":          func(e *gmaps.Entry) string { return e.Status },
-		"Timezone":        func(e *gmaps.Entry) string { return e.Timezone },
-		"Price Range":     func(e *gmaps.Entry) string { return e.PriceRange },
-		"Data ID":         func(e *gmaps.Entry) string { return e.DataID },
-	}
-
-	// Parse requested columns
-	var selectedColumns []string
-	colsParam := r.URL.Query().Get("columns")
-	if colsParam != "" {
-		requested := strings.Split(colsParam, ",")
-		for _, col := range requested {
-			col = strings.TrimSpace(col)
-			if _, ok := availableColumns[col]; ok {
-				selectedColumns = append(selectedColumns, col)
-			}
-		}
-	}
-
-	// Default columns if none selected or invalid
-	if len(selectedColumns) == 0 {
-		selectedColumns = []string{
-			"Title", "Address", "Phone", "Website", "Category", "Rating", "Reviews",
-			"Latitude", "Longitude", "Place ID", "Google Maps URL",
-		}
-	}
+	availableColumns := getAvailableColumns()
+	selectedColumns := parseSelectedColumns(r.URL.Query().Get("columns"), availableColumns)
 
 	writer := csv.NewWriter(w)
 	defer writer.Flush()
@@ -531,6 +496,120 @@ func (h *JobHandler) downloadCSV(w http.ResponseWriter, r *http.Request, jobID u
 	if err != nil {
 		// Log error if needed
 	}
+}
+
+func (h *JobHandler) downloadXLSX(w http.ResponseWriter, r *http.Request, jobID uuid.UUID) {
+	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	w.Header().Set("Content-Disposition", "attachment; filename=results-"+jobID.String()+".xlsx")
+
+	availableColumns := getAvailableColumns()
+
+	// Parse requested columns
+	selectedColumns := parseSelectedColumns(r.URL.Query().Get("columns"), availableColumns)
+
+	// Create Excel file
+	f := excelize.NewFile()
+	defer f.Close()
+
+	sheetName := "Results"
+	f.SetSheetName("Sheet1", sheetName)
+
+	// Write header row
+	for i, col := range selectedColumns {
+		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
+		f.SetCellValue(sheetName, cell, col)
+	}
+
+	// Style the header
+	headerStyle, _ := f.NewStyle(&excelize.Style{
+		Font: &excelize.Font{Bold: true},
+		Fill: excelize.Fill{Type: "pattern", Color: []string{"#E0E0E0"}, Pattern: 1},
+	})
+	lastCol, _ := excelize.CoordinatesToCellName(len(selectedColumns), 1)
+	f.SetCellStyle(sheetName, "A1", lastCol, headerStyle)
+
+	rowNum := 2
+	err := h.results.StreamByJobID(r.Context(), jobID, func(data []byte) error {
+		var entry gmaps.Entry
+		if err := json.Unmarshal(data, &entry); err != nil {
+			return err
+		}
+
+		for i, col := range selectedColumns {
+			cell, _ := excelize.CoordinatesToCellName(i+1, rowNum)
+			f.SetCellValue(sheetName, cell, availableColumns[col](&entry))
+		}
+		rowNum++
+		return nil
+	})
+
+	if err != nil {
+		log.Printf("error streaming results for XLSX: %v", err)
+	}
+
+	// Auto-fit column widths (approximate)
+	for i := range selectedColumns {
+		colName, _ := excelize.ColumnNumberToName(i + 1)
+		f.SetColWidth(sheetName, colName, colName, 15)
+	}
+
+	// Write to response
+	if err := f.Write(w); err != nil {
+		log.Printf("error writing XLSX to response: %v", err)
+	}
+}
+
+// getAvailableColumns returns the map of available export columns
+func getAvailableColumns() map[string]func(e *gmaps.Entry) string {
+	return map[string]func(e *gmaps.Entry) string{
+		"Title":           func(e *gmaps.Entry) string { return e.Title },
+		"Address":         func(e *gmaps.Entry) string { return e.Address },
+		"Phone":           func(e *gmaps.Entry) string { return e.Phone },
+		"Website":         func(e *gmaps.Entry) string { return e.WebSite },
+		"Category":        func(e *gmaps.Entry) string { return e.Category },
+		"Rating":          func(e *gmaps.Entry) string { return fmt.Sprintf("%.1f", e.ReviewRating) },
+		"Reviews":         func(e *gmaps.Entry) string { return fmt.Sprintf("%d", e.ReviewCount) },
+		"Latitude":        func(e *gmaps.Entry) string { return fmt.Sprintf("%f", e.Latitude) },
+		"Longitude":       func(e *gmaps.Entry) string { return fmt.Sprintf("%f", e.Longtitude) },
+		"Place ID":        func(e *gmaps.Entry) string { return e.PlaceID },
+		"Google Maps URL": func(e *gmaps.Entry) string { return e.Link },
+		"Description":     func(e *gmaps.Entry) string { return e.Description },
+		"Status":          func(e *gmaps.Entry) string { return e.Status },
+		"Timezone":        func(e *gmaps.Entry) string { return e.Timezone },
+		"Price Range":     func(e *gmaps.Entry) string { return e.PriceRange },
+		"Data ID":         func(e *gmaps.Entry) string { return e.DataID },
+		"Email": func(e *gmaps.Entry) string { return strings.Join(e.Emails, ", ") },
+		"Opening Hours": func(e *gmaps.Entry) string {
+			var parts []string
+			for day, hours := range e.OpenHours {
+				parts = append(parts, fmt.Sprintf("%s: %s", day, strings.Join(hours, ", ")))
+			}
+			return strings.Join(parts, "; ")
+		},
+	}
+}
+
+// parseSelectedColumns parses and validates requested columns
+func parseSelectedColumns(colsParam string, availableColumns map[string]func(e *gmaps.Entry) string) []string {
+	var selectedColumns []string
+	if colsParam != "" {
+		requested := strings.Split(colsParam, ",")
+		for _, col := range requested {
+			col = strings.TrimSpace(col)
+			if _, ok := availableColumns[col]; ok {
+				selectedColumns = append(selectedColumns, col)
+			}
+		}
+	}
+
+	// Default columns if none selected or invalid
+	if len(selectedColumns) == 0 {
+		selectedColumns = []string{
+			"Title", "Address", "Phone", "Website", "Category", "Rating", "Reviews",
+			"Latitude", "Longitude", "Place ID", "Google Maps URL",
+		}
+	}
+	return selectedColumns
 }
 
 // GetStats handles GET /api/v2/jobs/stats

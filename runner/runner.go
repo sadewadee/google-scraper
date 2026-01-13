@@ -90,6 +90,12 @@ type Config struct {
 	// StaticFolder is the path to static frontend files
 	StaticFolder string
 
+	// Redis configuration for job queue
+	RedisURL  string
+	RedisAddr string
+	RedisPass string
+	RedisDB   int
+
 	// ProxyGate flags
 	ProxyGateEnabled         bool
 	ProxyGateAddr            string
@@ -148,6 +154,12 @@ func ParseConfig() *Config {
 	flag.StringVar(&cfg.ManagerURL, "manager-url", "http://localhost:8080", "manager API URL for worker mode")
 	flag.StringVar(&cfg.WorkerID, "worker-id", "", "worker ID (auto-generated if empty)")
 	flag.StringVar(&cfg.StaticFolder, "static-folder", "", "path to static frontend files")
+
+	// Redis flags
+	flag.StringVar(&cfg.RedisURL, "redis-url", "", "Redis connection URL (redis://user:pass@host:port/db)")
+	flag.StringVar(&cfg.RedisAddr, "redis-addr", "", "Redis address (host:port)")
+	flag.StringVar(&cfg.RedisPass, "redis-pass", "", "Redis password")
+	flag.IntVar(&cfg.RedisDB, "redis-db", 0, "Redis database number")
 
 	// ProxyGate flags
 	flag.BoolVar(&cfg.ProxyGateEnabled, "proxygate", false, "enable embedded proxy gateway")

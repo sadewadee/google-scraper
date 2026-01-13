@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/sadewadee/google-scraper/internal/domain"
+	"github.com/sadewadee/google-scraper/internal/queue"
 )
 
 // Common errors
@@ -25,13 +26,15 @@ var (
 type JobService struct {
 	jobs    domain.JobRepository
 	results domain.ResultRepository
+	queue   *queue.Queue
 }
 
 // NewJobService creates a new JobService
-func NewJobService(jobs domain.JobRepository, results domain.ResultRepository) *JobService {
+func NewJobService(jobs domain.JobRepository, results domain.ResultRepository, q *queue.Queue) *JobService {
 	return &JobService{
 		jobs:    jobs,
 		results: results,
+		queue:   q,
 	}
 }
 
@@ -50,6 +53,17 @@ func (s *JobService) Create(ctx context.Context, req *domain.CreateJobRequest) (
 	}
 
 	log.Printf("[JobService] Create completed in %v (db: %v)", time.Since(start), time.Since(dbStart))
+
+	// Enqueue to Redis queue if available
+	if s.queue != nil {
+		if err := s.queue.Enqueue(ctx, job.ID, job.Priority); err != nil {
+			// Log error but don't fail job creation - worker can still poll
+			log.Printf("[JobService] WARNING: failed to enqueue job %s to Redis: %v", job.ID, err)
+		} else {
+			log.Printf("[JobService] Job %s enqueued to Redis queue", job.ID)
+		}
+	}
+
 	return job, nil
 }
 
@@ -142,6 +156,15 @@ func (s *JobService) Resume(ctx context.Context, id uuid.UUID) (*domain.Job, err
 	// Resume to pending so a worker can pick it up
 	if err := s.jobs.UpdateStatus(ctx, id, domain.JobStatusPending); err != nil {
 		return nil, fmt.Errorf("failed to resume job: %w", err)
+	}
+
+	// Re-enqueue to Redis queue if available
+	if s.queue != nil {
+		if err := s.queue.Enqueue(ctx, job.ID, job.Priority); err != nil {
+			log.Printf("[JobService] WARNING: failed to re-enqueue resumed job %s to Redis: %v", job.ID, err)
+		} else {
+			log.Printf("[JobService] Resumed job %s re-enqueued to Redis queue", job.ID)
+		}
 	}
 
 	job.Status = domain.JobStatusPending

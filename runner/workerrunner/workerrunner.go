@@ -22,6 +22,12 @@ type Config struct {
 
 	// RunnerConfig is the scraping configuration
 	RunnerConfig *runner.Config
+
+	// Redis configuration for job queue
+	RedisURL  string
+	RedisAddr string
+	RedisPass string
+	RedisDB   int
 }
 
 // WorkerRunner runs a worker that claims and processes jobs
@@ -49,7 +55,17 @@ func New(cfg *Config) (runner.Runner, error) {
 		cfg.RunnerConfig.DataFolder = "."
 	}
 
-	r, err := worker.NewRunner(cfg.ManagerURL, cfg.WorkerID, cfg.RunnerConfig)
+	workerCfg := &worker.Config{
+		ManagerURL:   cfg.ManagerURL,
+		WorkerID:     cfg.WorkerID,
+		RunnerConfig: cfg.RunnerConfig,
+		RedisURL:     cfg.RedisURL,
+		RedisAddr:    cfg.RedisAddr,
+		RedisPass:    cfg.RedisPass,
+		RedisDB:      cfg.RedisDB,
+	}
+
+	r, err := worker.NewRunner(workerCfg)
 	if err != nil {
 		return nil, err
 	}

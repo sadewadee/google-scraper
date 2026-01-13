@@ -104,12 +104,22 @@ func main() {
 func runnerFactory(cfg *runner.Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 	switch cfg.RunMode {
 	case runner.RunModeFile:
+		log.Println("DEPRECATED: File mode (-input/-results) is deprecated.")
+		log.Println("Consider using Manager/Worker mode for production deployments:")
+		log.Println("  Manager: ./gmaps-scraper -manager -dsn 'postgres://...' -redis-addr localhost:6379")
+		log.Println("  Worker:  ./gmaps-scraper -worker -manager-url http://localhost:8080 -redis-addr localhost:6379")
 		return filerunner.New(cfg)
 	case runner.RunModeDatabase, runner.RunModeDatabaseProduce:
+		log.Println("DEPRECATED: Database mode (-dsn without -manager) is deprecated.")
+		log.Println("Consider using Manager/Worker mode for production deployments with Redis queue support.")
 		return databaserunner.New(cfg)
 	case runner.RunModeInstallPlaywright:
 		return installplaywright.New(cfg)
 	case runner.RunModeWeb:
+		log.Println("DEPRECATED: Web mode (-web) with SQLite is deprecated.")
+		log.Println("Consider using Manager/Worker mode for production deployments:")
+		log.Println("  Manager: ./gmaps-scraper -manager -dsn 'postgres://...' -redis-addr localhost:6379")
+		log.Println("  Worker:  ./gmaps-scraper -worker -manager-url http://localhost:8080 -redis-addr localhost:6379")
 		return webrunner.New(cfg)
 	case runner.RunModeAwsLambda:
 		return lambdaaws.New(cfg)
@@ -121,12 +131,20 @@ func runnerFactory(cfg *runner.Config, pg *proxygate.ProxyGate) (runner.Runner, 
 			Address:      cfg.Addr,
 			DataFolder:   cfg.DataFolder,
 			StaticFolder: cfg.StaticFolder,
+			RedisURL:     cfg.RedisURL,
+			RedisAddr:    cfg.RedisAddr,
+			RedisPass:    cfg.RedisPass,
+			RedisDB:      cfg.RedisDB,
 		}, pg)
 	case runner.RunModeWorker:
 		return workerrunner.New(&workerrunner.Config{
 			ManagerURL:   cfg.ManagerURL,
 			WorkerID:     cfg.WorkerID,
 			RunnerConfig: cfg,
+			RedisURL:     cfg.RedisURL,
+			RedisAddr:    cfg.RedisAddr,
+			RedisPass:    cfg.RedisPass,
+			RedisDB:      cfg.RedisDB,
 		})
 	default:
 		return nil, fmt.Errorf("%w: %d", runner.ErrInvalidRunMode, cfg.RunMode)

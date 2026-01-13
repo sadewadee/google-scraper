@@ -20,6 +20,7 @@ import (
 	"github.com/sadewadee/google-scraper/internal/domain"
 	"github.com/sadewadee/google-scraper/internal/heartbeat"
 	"github.com/sadewadee/google-scraper/internal/proxygate"
+	"github.com/sadewadee/google-scraper/internal/queue"
 	"github.com/sadewadee/google-scraper/internal/repository/postgres"
 	"github.com/sadewadee/google-scraper/internal/repository/sqlite"
 	"github.com/sadewadee/google-scraper/internal/service"
@@ -43,6 +44,12 @@ type Config struct {
 
 	// DataFolder is where to store temporary files
 	DataFolder string
+
+	// Redis configuration for job queue
+	RedisURL  string
+	RedisAddr string
+	RedisPass string
+	RedisDB   int
 }
 
 // ManagerRunner runs the manager (Web UI + API) without scraping
@@ -56,6 +63,7 @@ type ManagerRunner struct {
 	statsSvc  *service.StatsService
 	hbMonitor *heartbeat.Monitor
 	proxyGate *proxygate.ProxyGate
+	jobQueue  *queue.Queue
 }
 
 // New creates a new ManagerRunner
@@ -142,8 +150,29 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 		resultRepo = repos.Results
 	}
 
+	// Initialize Redis queue (optional - gracefully handles missing Redis)
+	var jobQueue *queue.Queue
+	if cfg.RedisURL != "" || cfg.RedisAddr != "" {
+		queueCfg := &queue.Config{
+			RedisURL:  cfg.RedisURL,
+			RedisAddr: cfg.RedisAddr,
+			Password:  cfg.RedisPass,
+			DB:        cfg.RedisDB,
+		}
+		q, err := queue.New(queueCfg)
+		if err != nil {
+			log.Printf("manager: WARNING - failed to connect to Redis queue: %v", err)
+			log.Println("manager: continuing without Redis queue (workers must poll)")
+		} else {
+			jobQueue = q
+			log.Println("manager: Redis queue connected")
+		}
+	} else {
+		log.Println("manager: no Redis configured, workers will use HTTP polling")
+	}
+
 	// Initialize services
-	jobSvc := service.NewJobService(jobRepo, resultRepo)
+	jobSvc := service.NewJobService(jobRepo, resultRepo, jobQueue)
 	workerSvc := service.NewWorkerService(workerRepo, jobRepo)
 	resultSvc := service.NewResultService(resultRepo)
 	statsSvc := service.NewStatsService(jobRepo, workerRepo, resultRepo)
@@ -257,6 +286,7 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 		statsSvc:  statsSvc,
 		hbMonitor: hbMonitor,
 		proxyGate: pg,
+		jobQueue:  jobQueue,
 	}, nil
 }
 
@@ -279,6 +309,9 @@ func (m *ManagerRunner) Run(ctx context.Context) error {
 
 // Close cleans up resources
 func (m *ManagerRunner) Close(_ context.Context) error {
+	if m.jobQueue != nil {
+		m.jobQueue.Close()
+	}
 	if m.db != nil {
 		return m.db.Close()
 	}
