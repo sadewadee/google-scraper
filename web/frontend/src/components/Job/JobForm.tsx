@@ -1,12 +1,13 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { useForm } from "react-hook-form"
 import { AxiosError } from "axios"
+import { toast } from "sonner"
 import { Button } from "@/components/UI/Button"
 import { Input } from "@/components/UI/Input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/UI/Card"
 import { jobsApi } from "@/api/jobs"
-import type { JobCreatePayload } from "@/api/types"
+import type { JobCreatePayload, Job } from "@/api/types"
 import { AlertCircle, CheckCircle2 } from "lucide-react"
 
 interface FormData {
@@ -24,7 +25,12 @@ interface FormData {
     max_time: number
 }
 
-export function JobForm() {
+interface JobFormProps {
+    cloneFrom?: Job
+    isRetry?: boolean
+}
+
+export function JobForm({ cloneFrom, isRetry }: JobFormProps) {
     const navigate = useNavigate()
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState(false)
@@ -35,6 +41,7 @@ export function JobForm() {
         formState: { isSubmitting },
         reset,
         watch,
+        setValue,
     } = useForm<FormData>({
         defaultValues: {
             name: "",
@@ -51,6 +58,24 @@ export function JobForm() {
             max_time: 600, // 10 minutes
         },
     })
+
+    // Pre-fill form when cloning a job
+    useEffect(() => {
+        if (cloneFrom) {
+            setValue("name", isRetry ? `${cloneFrom.name} (Retry)` : `${cloneFrom.name} (Copy)`)
+            setValue("keywords", cloneFrom.config.keywords.join("\n"))
+            setValue("lang", cloneFrom.config.lang)
+            setValue("zoom", cloneFrom.config.zoom)
+            setValue("radius", cloneFrom.config.radius)
+            setValue("depth", cloneFrom.config.depth)
+            setValue("fast_mode", cloneFrom.config.fast_mode)
+            setValue("extract_email", cloneFrom.config.extract_email)
+            setValue("priority", cloneFrom.priority)
+            setValue("max_time", cloneFrom.config.max_time)
+            if (cloneFrom.config.geo_lat) setValue("lat", String(cloneFrom.config.geo_lat))
+            if (cloneFrom.config.geo_lon) setValue("lon", String(cloneFrom.config.geo_lon))
+        }
+    }, [cloneFrom, isRetry, setValue])
 
     const isFastMode = watch("fast_mode")
     const isExtractEmail = watch("extract_email")
@@ -119,6 +144,7 @@ export function JobForm() {
 
             if (response) {
                 setSuccess(true)
+                toast.success("Job created successfully")
                 reset()
                 // Redirect to jobs list after 1 second
                 setTimeout(() => {
@@ -128,9 +154,12 @@ export function JobForm() {
         } catch (err) {
             console.error("Failed to create job:", err)
             if (err instanceof AxiosError) {
-                setError(err.response?.data?.message || "Failed to create job")
+                const errorMessage = err.response?.data?.message || "Failed to create job"
+                setError(errorMessage)
+                toast.error(errorMessage)
             } else {
                 setError("An unexpected error occurred")
+                toast.error("An unexpected error occurred")
             }
         }
     }

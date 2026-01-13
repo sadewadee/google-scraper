@@ -21,6 +21,14 @@ export const jobsApi = {
         await api.post(`/jobs/${id}/cancel`)
     },
 
+    pause: async (id: string): Promise<void> => {
+        await api.post(`/jobs/${id}/pause`)
+    },
+
+    resume: async (id: string): Promise<void> => {
+        await api.post(`/jobs/${id}/resume`)
+    },
+
     delete: async (id: string): Promise<void> => {
         await api.delete(`/jobs/${id}`)
     },
@@ -32,7 +40,7 @@ export const jobsApi = {
         return response.data
     },
 
-    downloadResults: (id: string, format: 'csv' | 'json', columns?: string[]): string => {
+    downloadResults: (id: string, format: 'csv' | 'json' | 'xlsx', columns?: string[]): string => {
         const baseUrl = api.defaults.baseURL || '/api/v2'
         const params = new URLSearchParams({ format })
         if (columns && columns.length > 0) {

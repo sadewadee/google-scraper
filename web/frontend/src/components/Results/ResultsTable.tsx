@@ -240,7 +240,7 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
         )
     }
 
-    const handleExport = (format: 'csv' | 'json') => {
+    const handleExport = (format: 'csv' | 'json' | 'xlsx') => {
         const columnLabels = AVAILABLE_COLUMNS
             .filter(c => visibleColumns.includes(c.key))
             .map(c => c.label)
@@ -317,6 +317,10 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
                     <Button variant="outline" onClick={() => handleExport('csv')}>
                         <Download className="mr-2 h-4 w-4" />
                         CSV
+                    </Button>
+                    <Button variant="outline" onClick={() => handleExport('xlsx')}>
+                        <Download className="mr-2 h-4 w-4" />
+                        XLSX
                     </Button>
                     <Button variant="outline" onClick={() => handleExport('json')}>
                         <Download className="mr-2 h-4 w-4" />

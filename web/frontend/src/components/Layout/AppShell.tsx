@@ -7,7 +7,8 @@ import {
     Menu,
     X,
     Globe,
-    LogOut
+    LogOut,
+    Database
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
@@ -17,6 +18,7 @@ import { removeApiKey } from "@/api/client"
 const NAV_ITEMS = [
     { label: "Dashboard", href: "/", icon: LayoutDashboard },
     { label: "Jobs", href: "/jobs", icon: ListCheck },
+    { label: "Results", href: "/results", icon: Database },
     { label: "Workers", href: "/workers", icon: Server },
     { label: "Proxy Gate", href: "/proxies", icon: Globe },
     { label: "Settings", href: "/settings", icon: Settings },

@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
+import { Toaster } from "sonner"
 import { AppShell } from "./components/Layout/AppShell"
 import { isAuthenticated } from "./api/client"
 import Dashboard from "./pages/Dashboard"
@@ -9,6 +10,7 @@ import JobDetail from "./pages/Jobs/JobDetail"
 import Workers from "./pages/Workers"
 import Settings from "./pages/Settings"
 import ProxyGate from "./pages/ProxyGate"
+import Results from "./pages/Results"
 import Login from "./pages/Login"
 
 const queryClient = new QueryClient({
@@ -31,6 +33,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <Toaster position="top-right" richColors closeButton />
       <BrowserRouter>
         <Routes>
           {/* Public route */}
@@ -47,6 +50,7 @@ function App() {
                     <Route path="/jobs" element={<Jobs />} />
                     <Route path="/jobs/new" element={<JobCreate />} />
                     <Route path="/jobs/:id" element={<JobDetail />} />
+                    <Route path="/results" element={<Results />} />
                     <Route path="/workers" element={<Workers />} />
                     <Route path="/proxies" element={<ProxyGate />} />
                     <Route path="/settings" element={<Settings />} />

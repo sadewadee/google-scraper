@@ -1,20 +1,71 @@
-import { useParams, Link } from "react-router-dom"
+import { useParams, Link, useNavigate } from "react-router-dom"
+import { toast } from "sonner"
 import { Button } from "@/components/UI/Button"
 import { Badge } from "@/components/UI/Badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/UI/Card"
-import { ArrowLeft, Clock, MapPin } from "lucide-react"
+import { ArrowLeft, Clock, MapPin, Pause, Play, XCircle, Trash2, Copy, RotateCcw } from "lucide-react"
 import { ResultsTable } from "@/components/Results/ResultsTable"
 
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { jobsApi } from "@/api/jobs"
 
 export default function JobDetail() {
     const { id } = useParams()
+    const navigate = useNavigate()
+    const queryClient = useQueryClient()
 
     const { data: jobRes, isLoading } = useQuery({
         queryKey: ["job", id],
         queryFn: () => jobsApi.getOne(id!),
-        enabled: !!id
+        enabled: !!id,
+        refetchInterval: (query) => {
+            const job = query.state.data?.data
+            return job?.status === 'running' || job?.status === 'pending' ? 3000 : false
+        }
+    })
+
+    const pauseMutation = useMutation({
+        mutationFn: jobsApi.pause,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["job", id] })
+            toast.success("Job paused")
+        },
+        onError: () => {
+            toast.error("Failed to pause job")
+        }
+    })
+
+    const resumeMutation = useMutation({
+        mutationFn: jobsApi.resume,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["job", id] })
+            toast.success("Job resumed")
+        },
+        onError: () => {
+            toast.error("Failed to resume job")
+        }
+    })
+
+    const cancelMutation = useMutation({
+        mutationFn: jobsApi.cancel,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["job", id] })
+            toast.success("Job cancelled")
+        },
+        onError: () => {
+            toast.error("Failed to cancel job")
+        }
+    })
+
+    const deleteMutation = useMutation({
+        mutationFn: jobsApi.delete,
+        onSuccess: () => {
+            toast.success("Job deleted")
+            navigate("/jobs")
+        },
+        onError: () => {
+            toast.error("Failed to delete job")
+        }
     })
 
     const job = jobRes?.data
@@ -39,6 +90,70 @@ export default function JobDetail() {
                         </h2>
                         <p className="text-muted-foreground">Created on {new Date(job.created_at).toLocaleDateString()}</p>
                     </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    {job.status === 'failed' && (
+                        <Button
+                            variant="outline"
+                            onClick={() => navigate('/jobs/new', { state: { cloneFrom: job, isRetry: true } })}
+                        >
+                            <RotateCcw className="h-4 w-4 mr-2" />
+                            Retry
+                        </Button>
+                    )}
+                    <Button
+                        variant="outline"
+                        onClick={() => navigate('/jobs/new', { state: { cloneFrom: job } })}
+                    >
+                        <Copy className="h-4 w-4 mr-2" />
+                        Clone
+                    </Button>
+                    {job.status === 'running' && (
+                        <Button
+                            variant="outline"
+                            onClick={() => pauseMutation.mutate(id!)}
+                            disabled={pauseMutation.isPending}
+                        >
+                            <Pause className="h-4 w-4 mr-2" />
+                            Pause
+                        </Button>
+                    )}
+                    {job.status === 'paused' && (
+                        <Button
+                            variant="outline"
+                            onClick={() => resumeMutation.mutate(id!)}
+                            disabled={resumeMutation.isPending}
+                        >
+                            <Play className="h-4 w-4 mr-2" />
+                            Resume
+                        </Button>
+                    )}
+                    {(job.status === 'pending' || job.status === 'running' || job.status === 'paused') && (
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                if (confirm('Are you sure you want to cancel this job?')) {
+                                    cancelMutation.mutate(id!)
+                                }
+                            }}
+                            disabled={cancelMutation.isPending}
+                        >
+                            <XCircle className="h-4 w-4 mr-2" />
+                            Cancel
+                        </Button>
+                    )}
+                    <Button
+                        variant="destructive"
+                        onClick={() => {
+                            if (confirm('Are you sure you want to delete this job?')) {
+                                deleteMutation.mutate(id!)
+                            }
+                        }}
+                        disabled={deleteMutation.isPending}
+                    >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                    </Button>
                 </div>
             </div>
 

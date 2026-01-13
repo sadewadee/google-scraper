@@ -7,13 +7,37 @@ import {
     TableRow,
 } from "@/components/UI/Table"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/UI/Card"
+import { Badge } from "@/components/UI/Badge"
 import { Circle, Server, Activity, Clock } from "lucide-react"
+import { Link } from "react-router-dom"
 
 // Mock Data
 import { useQuery } from "@tanstack/react-query"
 import { workersApi } from "@/api/workers"
 
-// Mock Data Removed
+// Helper function for relative time
+function formatRelativeTime(dateStr: string): string {
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffSec = Math.floor(diffMs / 1000)
+    const diffMin = Math.floor(diffSec / 60)
+    const diffHour = Math.floor(diffMin / 60)
+    const diffDay = Math.floor(diffHour / 24)
+
+    if (diffSec < 60) return `${diffSec}s ago`
+    if (diffMin < 60) return `${diffMin}m ago`
+    if (diffHour < 24) return `${diffHour}h ago`
+    return `${diffDay}d ago`
+}
+
+// Helper function for uptime
+function formatUptime(seconds: number): string {
+    const hours = Math.floor(seconds / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+    if (hours > 0) return `${hours}h ${minutes}m`
+    return `${minutes}m`
+}
 
 export function WorkerList() {
     const { data: workersRes, isLoading } = useQuery({
@@ -75,17 +99,18 @@ export function WorkerList() {
                                 <TableHead>Status</TableHead>
                                 <TableHead>Current Job</TableHead>
                                 <TableHead className="text-right">Jobs Completed</TableHead>
+                                <TableHead className="text-right">Uptime</TableHead>
                                 <TableHead className="text-right">Last Heartbeat</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="h-24 text-center">Loading workers...</TableCell>
+                                    <TableCell colSpan={7} className="h-24 text-center">Loading workers...</TableCell>
                                 </TableRow>
                             ) : workers.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="h-24 text-center">No workers found.</TableCell>
+                                    <TableCell colSpan={7} className="h-24 text-center">No workers found.</TableCell>
                                 </TableRow>
                             ) : (
                                 workers.map((worker) => (
@@ -98,19 +123,16 @@ export function WorkerList() {
                                             <div className="text-xs text-muted-foreground font-mono">{worker.id}</div>
                                         </TableCell>
                                         <TableCell>
-                                            <div className="flex items-center gap-2">
-                                                <Circle className={`h-3 w-3 fill-current ${worker.status === 'online' ? 'text-green-500' :
-                                                    worker.status === 'busy' ? 'text-blue-500' :
-                                                        'text-gray-400'
-                                                    }`} />
-                                                <span className="capitalize">{worker.status}</span>
-                                            </div>
+                                            <Badge variant={worker.status === 'online' ? 'completed' : worker.status === 'busy' ? 'running' : 'failed'}>
+                                                <Circle className={`h-2 w-2 mr-1 fill-current`} />
+                                                {worker.status}
+                                            </Badge>
                                         </TableCell>
                                         <TableCell>
                                             {worker.current_job_id ? (
-                                                <span className="font-mono text-xs bg-muted px-2 py-1 rounded">
+                                                <Link to={`/jobs/${worker.current_job_id}`} className="font-mono text-xs bg-muted px-2 py-1 rounded hover:bg-muted/80">
                                                     #{worker.current_job_id}
-                                                </span>
+                                                </Link>
                                             ) : (
                                                 <span className="text-muted-foreground">-</span>
                                             )}
@@ -119,7 +141,10 @@ export function WorkerList() {
                                             {worker.stats.jobs_completed.toLocaleString()}
                                         </TableCell>
                                         <TableCell className="text-right text-xs text-muted-foreground">
-                                            {new Date(worker.last_seen).toLocaleTimeString()}
+                                            {formatUptime(worker.stats.uptime_seconds)}
+                                        </TableCell>
+                                        <TableCell className="text-right text-xs text-muted-foreground">
+                                            {formatRelativeTime(worker.last_seen)}
                                         </TableCell>
                                     </TableRow>
                                 ))
