@@ -2,6 +2,22 @@
 
 A high-performance, open-source Google Maps scraper written in Go. Extracts detailed business information from Google Maps search results at scale.
 
+## ⚠️ IMPORTANT: Repository Info
+
+**This is a FORK repository: `sadewadee/google-scraper`**
+
+- **ALWAYS create issues in THIS repo**: `sadewadee/google-scraper`
+- **NEVER create issues in upstream**: `gosom/google-maps-scraper`
+- When using `gh issue create`, always use: `--repo sadewadee/google-scraper`
+
+```bash
+# CORRECT
+gh issue create --repo sadewadee/google-scraper --title "..." --body "..."
+
+# WRONG - DO NOT DO THIS
+gh issue create --repo gosom/google-maps-scraper --title "..." --body "..."
+```
+
 ## Quick Reference
 
 ```bash
@@ -62,15 +78,36 @@ main.go                 # Entry point, config parsing, runner initialization
 
 | Mode | Flag | Description |
 |------|------|-------------|
-| CLI | (default) | Input file → Output file |
-| Web UI | `-web` | Local dashboard at specified address |
-| Distributed | `-dsn` | PostgreSQL-coordinated multiple instances |
+| **Manager** | `-manager` | API server + Web UI (no scraping) - **RECOMMENDED** |
+| **Worker** | `-worker` | Scraper that connects to Manager via Redis |
+| CLI (deprecated) | `-input` | Input file → Output file |
+| Web UI (deprecated) | `-web` | Local dashboard with SQLite |
+| Distributed (deprecated) | `-dsn` | PostgreSQL-coordinated instances |
 | Serverless | `-aws-lambda` | AWS Lambda deployment |
+
+### Recommended Architecture (Manager/Worker)
+
+```bash
+# Manager (API + Dashboard)
+./gmaps-scraper -manager -dsn 'postgres://...' -redis-addr localhost:6379 -addr :8080
+
+# Worker (can run multiple instances)
+./gmaps-scraper -worker -manager-url http://localhost:8080 -redis-addr localhost:6379
+
+# Docker Compose (starts postgres, redis, manager, worker)
+docker-compose up -d
+docker-compose up -d --scale worker=4  # Scale to 4 workers
+```
 
 ## Key Configuration Flags
 
 | Flag | Description |
 |------|-------------|
+| `-manager` | Run as Manager (API + Web UI) |
+| `-worker` | Run as Worker (connects to Manager) |
+| `-manager-url` | Manager API URL for worker mode |
+| `-redis-addr` | Redis address for job queue |
+| `-dsn` | PostgreSQL connection string |
 | `-input` | Input file with queries |
 | `-results` | Output file path |
 | `-c` | Concurrency level |
