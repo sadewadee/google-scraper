@@ -111,6 +111,7 @@ type Repositories struct {
 	Jobs    *JobRepository
 	Workers *WorkerRepository
 	Results *ResultRepository
+	Proxies *ProxyRepository
 }
 
 // NewRepositories creates all repositories
@@ -119,5 +120,6 @@ func NewRepositories(db *sql.DB) *Repositories {
 		Jobs:    NewJobRepository(db),
 		Workers: NewWorkerRepository(db),
 		Results: NewResultRepository(db),
+		Proxies: NewProxyRepository(db),
 	}
 }
