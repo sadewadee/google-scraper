@@ -77,9 +77,3 @@ CREATE TABLE IF NOT EXISTS workers (
 CREATE INDEX IF NOT EXISTS idx_workers_heartbeat ON workers(last_heartbeat);
 
 -- =====================================================
--- Schema Migrations Table
--- =====================================================
-CREATE TABLE IF NOT EXISTS schema_migrations (
-    version TEXT PRIMARY KEY,
-    applied_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
