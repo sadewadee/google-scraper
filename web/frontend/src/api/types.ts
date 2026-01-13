@@ -91,6 +91,15 @@ export interface ProxySource {
     error_message?: string
 }
 
+export interface Review {
+    name: string
+    profile_picture: string
+    rating: number
+    description: string
+    images: string[]
+    when: string
+}
+
 // Result entry from Google Maps scraping (matches gmaps.Entry in Go)
 export interface ResultEntry {
     input_id: string
@@ -136,14 +145,8 @@ export interface ResultEntry {
         name: string
         options: { name: string; enabled: boolean }[]
     }[]
-    user_reviews: {
-        name: string
-        profile_picture: string
-        rating: number
-        description: string
-        images: string[]
-        when: string
-    }[]
+    user_reviews: Review[]
+    user_reviews_extended: Review[]
     emails: string[]
 }
 
