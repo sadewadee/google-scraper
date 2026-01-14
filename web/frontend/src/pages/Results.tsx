@@ -68,7 +68,7 @@ export default function Results() {
                 entry.emails?.some((e) => e.toLowerCase().includes(searchLower))
             )
         })
-    }, [resultsData?.data, search])
+    }, [resultsData, search])
 
     const totalPages = resultsData?.meta?.total_pages || 1
     const total = resultsData?.meta?.total || 0
