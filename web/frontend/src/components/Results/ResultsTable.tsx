@@ -13,6 +13,8 @@ import {
 import { Button } from "@/components/UI/Button"
 import { Input } from "@/components/UI/Input"
 import { Badge } from "@/components/UI/Badge"
+import { Drawer } from "@/components/UI/Drawer"
+import { BusinessDetail } from "./BusinessDetail"
 import {
     Search,
     Download,
@@ -33,7 +35,7 @@ interface ColumnDef {
     key: keyof ResultEntry | string
     label: string
     defaultVisible: boolean
-    render?: (entry: ResultEntry) => React.ReactNode
+    render?: (entry: ResultEntry, onSelect?: (entry: ResultEntry) => void) => React.ReactNode
 }
 
 const AVAILABLE_COLUMNS: ColumnDef[] = [
@@ -41,10 +43,14 @@ const AVAILABLE_COLUMNS: ColumnDef[] = [
         key: "title",
         label: "Business Name",
         defaultVisible: true,
-        render: (e) => (
-            <div className="font-medium max-w-[200px] truncate" title={e.title}>
+        render: (e, onSelect) => (
+            <button
+                className="font-medium max-w-[200px] truncate hover:text-primary text-left transition-colors"
+                title={`View details for ${e.title}`}
+                onClick={() => onSelect?.(e)}
+            >
                 {e.title}
-            </div>
+            </button>
         ),
     },
     {
@@ -205,6 +211,7 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
     const [visibleColumns, setVisibleColumns] = useState<string[]>(
         AVAILABLE_COLUMNS.filter((c) => c.defaultVisible).map((c) => c.key)
     )
+    const [selectedBusiness, setSelectedBusiness] = useState<ResultEntry | null>(null)
     const perPage = 25
 
     const { data, isLoading, error } = useQuery({
@@ -370,7 +377,7 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
                                 <TableRow key={entry.place_id || entry.cid || idx}>
                                     {AVAILABLE_COLUMNS.filter((c) => visibleColumns.includes(c.key)).map((col) => (
                                         <TableCell key={col.key}>
-                                            {col.render ? col.render(entry) : String((entry as unknown as Record<string, unknown>)[col.key] || "-")}
+                                            {col.render ? col.render(entry, setSelectedBusiness) : String((entry as unknown as Record<string, unknown>)[col.key] || "-")}
                                         </TableCell>
                                     ))}
                                 </TableRow>
@@ -408,6 +415,15 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
                     </div>
                 </div>
             )}
+
+            {/* Detail Drawer */}
+            <Drawer
+                isOpen={!!selectedBusiness}
+                onClose={() => setSelectedBusiness(null)}
+                title={selectedBusiness?.title || "Business Details"}
+            >
+                {selectedBusiness && <BusinessDetail data={selectedBusiness} />}
+            </Drawer>
         </div>
     )
 }
