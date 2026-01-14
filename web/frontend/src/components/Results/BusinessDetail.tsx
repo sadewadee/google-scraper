@@ -1,5 +1,4 @@
-import React from "react"
-import { MapPin, Phone, Mail, Globe, Star, Clock, Calendar, ExternalLink, Image as ImageIcon } from "lucide-react"
+import { MapPin, Phone, Mail, Globe, Star, Clock, Calendar, Image as ImageIcon } from "lucide-react"
 import type { ResultEntry, Review } from "../../api/types"
 import { Button } from "../UI/Button"
 import { Badge } from "../UI/Badge"
@@ -17,23 +16,15 @@ export function BusinessDetail({ data }: BusinessDetailProps) {
         return data.address
     }
 
-    const formatTime = (minutes: number) => {
-        const h = Math.floor(minutes / 60)
-        const m = minutes % 60
-        const ampm = h >= 12 ? "PM" : "AM"
-        const hour = h % 12 || 12
-        return `${hour}:${m.toString().padStart(2, "0")} ${ampm}`
-    }
-
     const isOpen = () => {
         if (!data.open_hours) return null
 
         // Simple check logic could go here, but usually requires complex day/time parsing
         // For now, we'll just display the status string if available or generic
         return data.status === "OPEN" ?
-            <Badge variant="success">Open Now</Badge> :
+            <Badge variant="completed">Open Now</Badge> :
             data.status === "CLOSED" ?
-            <Badge variant="danger">Closed</Badge> :
+            <Badge variant="failed">Closed</Badge> :
             null
     }
 

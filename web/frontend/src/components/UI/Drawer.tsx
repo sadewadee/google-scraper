@@ -53,7 +53,8 @@ export function Drawer({ isOpen, onClose, title, children, width = "500px" }: Dr
                                 {title}
                             </div>
                             <Button
-                                variant="icon"
+                                variant="ghost"
+                                size="icon"
                                 onClick={onClose}
                                 className="!p-2 hover:text-red-500 shrink-0"
                             >
