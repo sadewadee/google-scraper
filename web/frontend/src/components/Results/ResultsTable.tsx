@@ -45,9 +45,14 @@ const AVAILABLE_COLUMNS: ColumnDef[] = [
         defaultVisible: true,
         render: (e, onSelect) => (
             <button
-                className="font-medium max-w-[200px] truncate hover:text-primary text-left transition-colors"
+                type="button"
+                className="font-medium max-w-[200px] truncate hover:text-primary hover:underline text-left transition-colors cursor-pointer focus:outline-none focus:text-primary"
                 title={`View details for ${e.title}`}
-                onClick={() => onSelect?.(e)}
+                onClick={(event) => {
+                    event.stopPropagation();
+                    event.preventDefault();
+                    onSelect?.(e);
+                }}
             >
                 {e.title}
             </button>
