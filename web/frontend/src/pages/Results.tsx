@@ -1,324 +1,311 @@
 import { useState, useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { resultsApi } from "@/api/results"
+import { resultsApi } from "../api/results"
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/UI/Table"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/UI/Card"
-import { Button } from "@/components/UI/Button"
-import { Input } from "@/components/UI/Input"
-import { Badge } from "@/components/UI/Badge"
+  Box,
+  Typography,
+  Button,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TablePagination,
+  TextField,
+  InputAdornment,
+  Grid2 as Grid,
+  Chip,
+  IconButton,
+  Link,
+  CircularProgress
+} from "@mui/material"
 import {
-    Search,
-    Download,
-    ChevronLeft,
-    ChevronRight,
-    Star,
-    ExternalLink,
-    Mail,
-    Phone,
-    MapPin,
-    X,
-    Database,
-} from "lucide-react"
-
-interface ResultEntry {
-    title?: string
-    address?: string
-    phone?: string
-    web_site?: string
-    category?: string
-    review_rating?: number
-    review_count?: number
-    emails?: string[]
-    place_id?: string
-    cid?: string
-    link?: string
-}
+  Search as SearchIcon,
+  DownloadOutlined,
+  StorageOutlined,
+  EmailOutlined,
+  PhoneOutlined,
+  LanguageOutlined,
+  Star,
+  Map,
+  CloseOutlined
+} from "@mui/icons-material"
+import { StatCard } from "../components/StatCard"
+import type { ResultEntry } from "../api/types"
 
 export default function Results() {
-    const [search, setSearch] = useState("")
-    const [page, setPage] = useState(1)
-    const perPage = 50
+  const [search, setSearch] = useState("")
+  const [page, setPage] = useState(0)
+  const [rowsPerPage, setRowsPerPage] = useState(50)
 
-    // Fetch all results globally
-    const { data: resultsData, isLoading } = useQuery({
-        queryKey: ["results", page, perPage],
-        queryFn: () => resultsApi.getAll(page, perPage),
+  // Fetch all results globally
+  const { data: resultsData, isLoading } = useQuery({
+    queryKey: ["results", page + 1, rowsPerPage],
+    queryFn: () => resultsApi.getAll(page + 1, rowsPerPage),
+  })
+
+  // Filter results based on search (client-side filtering of current page)
+  const filteredResults = useMemo(() => {
+    if (!resultsData?.data) return []
+    if (!search.trim()) return resultsData.data as ResultEntry[]
+
+    const searchLower = search.toLowerCase()
+    return (resultsData.data as ResultEntry[]).filter((entry) => {
+      return (
+        entry.title?.toLowerCase().includes(searchLower) ||
+        entry.address?.toLowerCase().includes(searchLower) ||
+        entry.phone?.toLowerCase().includes(searchLower) ||
+        entry.category?.toLowerCase().includes(searchLower) ||
+        entry.web_site?.toLowerCase().includes(searchLower) ||
+        entry.emails?.some((e) => e.toLowerCase().includes(searchLower))
+      )
     })
+  }, [resultsData, search])
 
-    // Filter results based on search (client-side filtering of current page)
-    const filteredResults = useMemo(() => {
-        if (!resultsData?.data) return []
-        if (!search.trim()) return resultsData.data as ResultEntry[]
+  const total = resultsData?.meta?.total || 0
 
-        const searchLower = search.toLowerCase()
-        return (resultsData.data as ResultEntry[]).filter((entry) => {
-            return (
-                entry.title?.toLowerCase().includes(searchLower) ||
-                entry.address?.toLowerCase().includes(searchLower) ||
-                entry.phone?.toLowerCase().includes(searchLower) ||
-                entry.category?.toLowerCase().includes(searchLower) ||
-                entry.web_site?.toLowerCase().includes(searchLower) ||
-                entry.emails?.some((e) => e.toLowerCase().includes(searchLower))
-            )
-        })
-    }, [resultsData, search])
+  const handleExport = (format: 'csv' | 'xlsx' | 'json') => {
+    const url = resultsApi.downloadUrl(format)
+    window.open(url, '_blank')
+  }
 
-    const totalPages = resultsData?.meta?.total_pages || 1
-    const total = resultsData?.meta?.total || 0
+  return (
+    <Box sx={{ p: { xs: 2, md: 3 }, bgcolor: '#F9FAFB', minHeight: '100%' }}>
+      {/* Header */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, color: '#000000' }}>
+          Results Database
+        </Typography>
+      </Box>
 
-    return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <h2 className="text-3xl font-bold tracking-tight">Results Database</h2>
-            </div>
+      {/* Stats */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <StatCard
+            title="Total Results"
+            value={total}
+            subtitle="Scraped listings"
+            icon={StorageOutlined}
+          />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <StatCard
+            title="Current Page"
+            value={`${page + 1}`}
+            subtitle={`of ${Math.ceil(total / rowsPerPage)}`}
+            icon={Map}
+          />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <StatCard
+            title="Showing"
+            value={filteredResults.length}
+            subtitle="On this page"
+            icon={SearchIcon}
+          />
+        </Grid>
+      </Grid>
 
-            {/* Stats */}
-            <div className="grid gap-4 md:grid-cols-3">
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">Total Results</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{total.toLocaleString()}</div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">Current Page</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{page} / {totalPages}</div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">Showing</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">
-                            {total > 0 ? `${((page - 1) * perPage) + 1}-${Math.min(page * perPage, total)}` : "0"}
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
+      {/* Search and Export */}
+      <Paper sx={{ p: 2, mb: 3, border: '2px solid #000000', borderRadius: '16px' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+          <StorageOutlined sx={{ mr: 1 }} />
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            All Scraped Results
+          </Typography>
+        </Box>
 
-            {/* Search and Export */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Database className="h-5 w-5" />
-                        All Scraped Results
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex flex-col sm:flex-row gap-4">
-                        <div className="flex-1">
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    placeholder="Filter by name, address, phone..."
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className="pl-9"
-                                />
-                                {search && (
-                                    <button
-                                        onClick={() => setSearch("")}
-                                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                    >
-                                        <X className="h-4 w-4" />
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                        <div className="flex gap-2">
-                            <Button
-                                variant="outline"
-                                onClick={() => {
-                                    const url = resultsApi.downloadUrl('csv')
-                                    window.open(url, '_blank')
-                                }}
-                            >
-                                <Download className="h-4 w-4 mr-2" />
-                                CSV
-                            </Button>
-                            <Button
-                                variant="outline"
-                                onClick={() => {
-                                    const url = resultsApi.downloadUrl('xlsx')
-                                    window.open(url, '_blank')
-                                }}
-                            >
-                                <Download className="h-4 w-4 mr-2" />
-                                Excel
-                            </Button>
-                            <Button
-                                variant="outline"
-                                onClick={() => {
-                                    const url = resultsApi.downloadUrl('json')
-                                    window.open(url, '_blank')
-                                }}
-                            >
-                                <Download className="h-4 w-4 mr-2" />
-                                JSON
-                            </Button>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2 }}>
+          <Box sx={{ flex: 1, position: 'relative' }}>
+            <TextField
+              fullWidth
+              placeholder="Filter by name, address, phone..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon sx={{ color: '#9CA3AF' }} />
+                    </InputAdornment>
+                  ),
+                  endAdornment: search && (
+                    <InputAdornment position="end">
+                      <IconButton size="small" onClick={() => setSearch("")}>
+                        <CloseOutlined fontSize="small" />
+                      </IconButton>
+                    </InputAdornment>
+                  )
+                }
+              }}
+              sx={{ bgcolor: '#FFFFFF' }}
+            />
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant="outlined"
+              onClick={() => handleExport('csv')}
+              startIcon={<DownloadOutlined />}
+              sx={{ borderColor: '#E5E7EB', color: '#374151' }}
+            >
+              CSV
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => handleExport('xlsx')}
+              startIcon={<DownloadOutlined />}
+              sx={{ borderColor: '#E5E7EB', color: '#374151' }}
+            >
+              Excel
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => handleExport('json')}
+              startIcon={<DownloadOutlined />}
+              sx={{ borderColor: '#E5E7EB', color: '#374151' }}
+            >
+              JSON
+            </Button>
+          </Box>
+        </Box>
+      </Paper>
 
-            {/* Results Table */}
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle>
-                        {search ? (
-                            <>Showing {filteredResults.length} results matching "{search}"</>
-                        ) : (
-                            <>Showing {((page - 1) * perPage) + 1}-{Math.min(page * perPage, total)} of {total} results</>
-                        )}
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="rounded-md border border-white/10">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Business Name</TableHead>
-                                    <TableHead>Category</TableHead>
-                                    <TableHead>Address</TableHead>
-                                    <TableHead>Phone</TableHead>
-                                    <TableHead>Email</TableHead>
-                                    <TableHead>Rating</TableHead>
-                                    <TableHead>Website</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {isLoading ? (
-                                    <TableRow>
-                                        <TableCell colSpan={7} className="text-center py-8">
-                                            <div className="flex items-center justify-center gap-2">
-                                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                                                Loading results...
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ) : filteredResults.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                                            {search ? "No results match your search." : "No results in database yet."}
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    filteredResults.map((entry, idx) => (
-                                        <TableRow key={entry.place_id || entry.cid || idx}>
-                                            <TableCell>
-                                                <div className="font-medium max-w-[200px] truncate" title={entry.title}>
-                                                    {entry.title}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline" className="text-xs">
-                                                    {entry.category || "-"}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="max-w-[200px] truncate text-sm text-muted-foreground" title={entry.address}>
-                                                    <MapPin className="inline h-3 w-3 mr-1" />
-                                                    {entry.address || "-"}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="text-sm">
-                                                    {entry.phone ? (
-                                                        <a href={`tel:${entry.phone}`} className="hover:text-primary flex items-center gap-1">
-                                                            <Phone className="h-3 w-3" />
-                                                            {entry.phone}
-                                                        </a>
-                                                    ) : (
-                                                        <span className="text-muted-foreground">-</span>
-                                                    )}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="text-sm">
-                                                    {entry.emails && entry.emails.length > 0 ? (
-                                                        <a href={`mailto:${entry.emails[0]}`} className="hover:text-primary flex items-center gap-1">
-                                                            <Mail className="h-3 w-3" />
-                                                            {entry.emails[0]}
-                                                        </a>
-                                                    ) : (
-                                                        <span className="text-muted-foreground">-</span>
-                                                    )}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-1 text-sm">
-                                                    <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
-                                                    <span>{entry.review_rating?.toFixed(1) || "-"}</span>
-                                                    <span className="text-muted-foreground">({entry.review_count || 0})</span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="text-sm max-w-[100px] truncate">
-                                                    {entry.web_site ? (
-                                                        <a
-                                                            href={entry.web_site}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="hover:text-primary flex items-center gap-1"
-                                                        >
-                                                            <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                                                            <span className="truncate">{new URL(entry.web_site).hostname}</span>
-                                                        </a>
-                                                    ) : (
-                                                        <span className="text-muted-foreground">-</span>
-                                                    )}
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                    </div>
+      {/* Results Table */}
+      <Paper sx={{ border: '2px solid #000000', borderRadius: '16px', overflow: 'hidden' }}>
+        <Box sx={{ p: 2, borderBottom: '1px solid #E5E7EB' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            {search
+              ? `Showing ${filteredResults.length} results matching "${search}"`
+              : `Showing ${filteredResults.length} of ${total} results`
+            }
+          </Typography>
+        </Box>
 
-                    {/* Pagination */}
-                    {totalPages > 1 && !search && (
-                        <div className="flex items-center justify-between mt-4">
-                            <div className="text-sm text-muted-foreground">
-                                Page {page} of {totalPages}
-                            </div>
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                                    disabled={page === 1}
-                                >
-                                    <ChevronLeft className="h-4 w-4 mr-1" />
-                                    Previous
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                                    disabled={page === totalPages}
-                                >
-                                    Next
-                                    <ChevronRight className="h-4 w-4 ml-1" />
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-        </div>
-    )
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow sx={{ bgcolor: '#F9FAFB' }}>
+                <TableCell sx={{ fontWeight: 700 }}>Business Name</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Category</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Address</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Phone</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Email</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Rating</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Website</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={7} sx={{ textAlign: 'center', py: 8 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2 }}>
+                      <CircularProgress size={20} sx={{ color: '#000000' }} />
+                      <Typography>Loading results...</Typography>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ) : filteredResults.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} sx={{ textAlign: 'center', py: 8 }}>
+                    <Typography sx={{ color: '#9CA3AF' }}>
+                      {search ? "No results match your search." : "No results in database yet."}
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredResults.map((entry, idx) => (
+                  <TableRow key={entry.place_id || entry.cid || idx} hover>
+                    <TableCell>
+                      <Typography sx={{ fontWeight: 600, maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={entry.title}>
+                        {entry.title}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={entry.category || "-"}
+                        size="small"
+                        variant="outlined"
+                        sx={{ fontSize: '0.75rem', borderRadius: '4px' }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', maxWidth: 200 }}>
+                        <Map sx={{ fontSize: 14, mr: 0.5, color: '#9CA3AF' }} />
+                        <Typography variant="body2" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={entry.address}>
+                          {entry.address || "-"}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      {entry.phone ? (
+                        <Link href={`tel:${entry.phone}`} underline="hover" sx={{ display: 'flex', alignItems: 'center', color: 'inherit' }}>
+                          <PhoneOutlined sx={{ fontSize: 14, mr: 0.5 }} />
+                          <Typography variant="body2">{entry.phone}</Typography>
+                        </Link>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">-</Typography>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {entry.emails && entry.emails.length > 0 ? (
+                        <Link href={`mailto:${entry.emails[0]}`} underline="hover" sx={{ display: 'flex', alignItems: 'center', color: 'inherit' }}>
+                          <EmailOutlined sx={{ fontSize: 14, mr: 0.5 }} />
+                          <Typography variant="body2">{entry.emails[0]}</Typography>
+                        </Link>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">-</Typography>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Star sx={{ fontSize: 16, color: '#EAB308', mr: 0.5 }} />
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {entry.review_rating?.toFixed(1) || "-"}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#9CA3AF', ml: 0.5 }}>
+                          ({entry.review_count || 0})
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      {entry.web_site ? (
+                        <Link
+                          href={entry.web_site}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          underline="hover"
+                          sx={{ display: 'flex', alignItems: 'center', color: 'inherit' }}
+                        >
+                          <LanguageOutlined sx={{ fontSize: 14, mr: 0.5 }} />
+                          <Typography variant="body2" sx={{ maxWidth: 150, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {new URL(entry.web_site).hostname}
+                          </Typography>
+                        </Link>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">-</Typography>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        <TablePagination
+          component="div"
+          count={total}
+          page={page}
+          onPageChange={(_, newPage) => setPage(newPage)}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={(e) => {
+            setRowsPerPage(parseInt(e.target.value, 10))
+            setPage(0)
+          }}
+          rowsPerPageOptions={[25, 50, 100]}
+        />
+      </Paper>
+    </Box>
+  )
 }
