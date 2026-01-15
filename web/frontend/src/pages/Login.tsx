@@ -1,97 +1,115 @@
-import { useState } from "react"
-import { useNavigate, Navigate } from "react-router-dom"
-import { AxiosError } from "axios"
-import { api, setApiKey, isAuthenticated } from "@/api/client"
-import { Button } from "@/components/UI/Button"
-import { Input } from "@/components/UI/Input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/UI/Card"
-import { KeyRound, AlertCircle } from "lucide-react"
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  TextField,
+  Button,
+  Alert,
+  Avatar,
+} from '@mui/material';
+import { LockOutlined } from '@mui/icons-material';
+import { setApiKey } from '../api/client';
 
 export default function Login() {
-    const [apiKeyInput, setApiKeyInput] = useState("")
-    const [error, setError] = useState("")
-    const [loading, setLoading] = useState(false)
-    const navigate = useNavigate()
+  const [apiKey, setApiKeyValue] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-    // Redirect if already authenticated
-    if (isAuthenticated()) {
-        return <Navigate to="/" replace />
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    if (!apiKey.trim()) {
+      setError('API Key is required');
+      setLoading(false);
+      return;
     }
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
-        setError("")
-        setLoading(true)
-
-        if (!apiKeyInput.trim()) {
-            setError("API Key is required")
-            setLoading(false)
-            return
-        }
-
-        try {
-            // Test the API key by making a request to stats endpoint
-            const response = await api.get("/stats", {
-                headers: {
-                    Authorization: `Bearer ${apiKeyInput}`,
-                },
-            })
-
-            if (response.status === 200) {
-                setApiKey(apiKeyInput)
-                navigate("/")
-            }
-        } catch (err) {
-            if (err instanceof AxiosError) {
-                if (err.response?.status === 401) {
-                    setError("Invalid API Key")
-                } else {
-                    setError("Failed to connect to server")
-                }
-            } else {
-                setError("An unexpected error occurred")
-            }
-        } finally {
-            setLoading(false)
-        }
+    try {
+      setApiKey(apiKey.trim());
+      navigate('/');
+    } catch {
+      setError('Invalid API Key');
+    } finally {
+      setLoading(false);
     }
+  };
 
-    return (
-        <div className="min-h-screen flex items-center justify-center bg-background p-4">
-            <Card className="w-full max-w-md">
-                <CardHeader className="text-center">
-                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                        <KeyRound className="h-6 w-6 text-primary" />
-                    </div>
-                    <CardTitle className="text-2xl">Scrapy Kremlit</CardTitle>
-                    <CardDescription>Enter your API Key to access the dashboard</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium leading-none">API Key</label>
-                            <Input
-                                type="password"
-                                placeholder="Enter your API key"
-                                value={apiKeyInput}
-                                onChange={(e) => setApiKeyInput(e.target.value)}
-                                autoFocus
-                            />
-                        </div>
+  return (
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        bgcolor: '#F9FAFB',
+        p: 2,
+      }}
+    >
+      <Card sx={{ maxWidth: 400, width: '100%', border: '2px solid #000000' }}>
+        <CardContent sx={{ p: 4 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
+            <Avatar
+              sx={{
+                width: 56,
+                height: 56,
+                bgcolor: '#FFD93D',
+                color: '#000000',
+                border: '2px solid #000000',
+                mb: 2,
+              }}
+            >
+              <LockOutlined />
+            </Avatar>
+            <Typography variant="h5" sx={{ fontWeight: 700, color: '#000000' }}>
+              GMaps Scraper
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#6B7280', mt: 0.5 }}>
+              Enter your API key to continue
+            </Typography>
+          </Box>
 
-                        {error && (
-                            <div className="flex items-center gap-2 text-sm text-destructive">
-                                <AlertCircle className="h-4 w-4" />
-                                {error}
-                            </div>
-                        )}
+          {error && (
+            <Alert severity="error" sx={{ mb: 2, border: '1px solid #EF4444' }}>
+              {error}
+            </Alert>
+          )}
 
-                        <Button type="submit" className="w-full" disabled={loading}>
-                            {loading ? "Verifying..." : "Login"}
-                        </Button>
-                    </form>
-                </CardContent>
-            </Card>
-        </div>
-    )
+          <form onSubmit={handleSubmit}>
+            <TextField
+              fullWidth
+              label="API Key"
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKeyValue(e.target.value)}
+              placeholder="Enter your API key"
+              sx={{ mb: 3 }}
+            />
+
+            <Button
+              fullWidth
+              type="submit"
+              variant="contained"
+              disabled={loading}
+              sx={{
+                py: 1.5,
+                bgcolor: '#FFD93D',
+                color: '#000000',
+                border: '2px solid #000000',
+                fontWeight: 600,
+                '&:hover': { bgcolor: '#FFC107' },
+              }}
+            >
+              {loading ? 'Signing in...' : 'Sign In'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </Box>
+  );
 }
