@@ -49,7 +49,12 @@ func New(cfg *runner.Config) (runner.Runner, error) {
 		return &ans, nil
 	}
 
-	psqlWriter := postgres.NewResultWriter(conn)
+	// Use result writer with parent progress sync enabled
+	// This updates jobs_queue.completed_tasks and status when gmaps_jobs complete
+	psqlWriter := postgres.NewResultWriterWithSync(postgres.ResultWriterConfig{
+		DB:                 conn,
+		SyncParentProgress: true,
+	})
 
 	writers := []scrapemate.ResultWriter{
 		psqlWriter,

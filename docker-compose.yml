@@ -25,7 +25,7 @@ services:
       - gmaps-network
 
   # ===========================================
-  # Redis - Job Queue & Deduplication
+  # Redis - Cache & Deduplication
   # ===========================================
   redis:
     image: redis:7-alpine
@@ -39,6 +39,28 @@ services:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - gmaps-network
+
+  # ===========================================
+  # RabbitMQ - Job Queue
+  # ===========================================
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: gmaps-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-gmaps}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-gmaps_secret}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    ports:
+      - "127.0.0.1:15672:15672"  # Management UI (localhost only)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
       retries: 5
     restart: unless-stopped
     networks:
@@ -120,6 +142,7 @@ services:
       - "-addr=:8080"
       - "-dsn=postgres://${POSTGRES_USER:-gmaps}:${POSTGRES_PASSWORD:-gmaps_secret}@db:5432/${POSTGRES_DB:-gmaps}?sslmode=disable"
       - "-redis-addr=redis:6379"
+      - "-rabbitmq-url=amqp://${RABBITMQ_USER:-gmaps}:${RABBITMQ_PASSWORD:-gmaps_secret}@rabbitmq:5672/"
       - "-static-folder=/usr/share/gmaps-scraper/static"
     ports:
       - "${WEB_PORT:-8080}:8080"
@@ -135,6 +158,8 @@ services:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     restart: unless-stopped
     networks:
@@ -153,7 +178,7 @@ services:
 
   # ===========================================
   # Scraper Worker (New Distributed Architecture)
-  # Claims jobs from Redis queue, processes independently
+  # Claims jobs from RabbitMQ queue, processes independently
   # Scale with: docker compose up --scale worker=N
   # ===========================================
   worker:
@@ -164,6 +189,7 @@ services:
       - "-worker"
       - "-manager-url=http://manager:8080"
       - "-redis-addr=redis:6379"
+      - "-rabbitmq-url=amqp://${RABBITMQ_USER:-gmaps}:${RABBITMQ_PASSWORD:-gmaps_secret}@rabbitmq:5672/"
       - "-c=${CONCURRENCY:-4}"
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-gmaps}
@@ -176,6 +202,8 @@ services:
       manager:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     restart: unless-stopped
     networks:
@@ -230,7 +258,10 @@ volumes:
     # Data persists across redeploys. Only deleted with: docker volume rm
   redis_data:
     driver: local
-    # Redis persistence for job queue state
+    # Redis persistence for cache and deduplication state
+  rabbitmq_data:
+    driver: local
+    # RabbitMQ persistence for job queue state
   scraper_data:
     driver: local
   manager_data:

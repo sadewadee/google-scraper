@@ -1,14 +1,51 @@
-# REVISED PLAN: Dashboard → DSN Bridge (Simplified)
+# FULL PLAN: Dashboard → DSN Bridge (RabbitMQ + Redis)
 
-> **Status**: REVISED based on user feedback
+> **Status**: ✅ FULLY IMPLEMENTED (Jan 2026)
 >
-> **Key Decisions**:
-> - ❌ RabbitMQ NOT needed (polling 50-300ms acceptable)
-> - ✅ DSN mode in production → minimal consumer changes
-> - ✅ 50+ workers → ensure efficient PostgreSQL polling
-> - ✅ Focus: Bridge Dashboard to `gmaps_jobs` table
-> - ✅ External Email Validation dengan Moribouncer
-> - ✅ Dashboard uses Manager mode (NOT WebRunner)
+> ## Implementation Summary
+>
+> | Component | Status | Details |
+> |-----------|--------|---------|
+> | **RabbitMQ** | ✅ Done | `internal/mq/publisher.go`, `consumer.go` - Priority queues |
+> | **Redis Cache** | ✅ Done | `internal/cache/redis.go`, `cached.go` - Dashboard caching |
+> | **Normalized Tables** | ✅ Done | `business_listings`, `emails`, `business_emails` |
+> | **Auto-populate Trigger** | ✅ Done | `trg_populate_normalized_listings` on INSERT to results |
+> | **Backfill Function** | ✅ Done | `backfill_normalized_listings(batch_size)` |
+> | **Email Validation** | ✅ Done | Moribouncer integration in `gmaps/emailjob.go` |
+> | **Cached Handlers** | ✅ Done | `CachedJobHandler`, `CachedStatsHandler`, `CachedResultHandler` |
+> | **Worker Thread Safety** | ✅ Done | `sync.RWMutex` for `currentJob` access |
+> | **Consumer Retry** | ✅ Done | Exponential backoff (1s-30s, max 5 retries) |
+> | **Memory Cache Cleanup** | ✅ Done | `stopChan` for goroutine lifecycle |
+>
+> ## Key Files
+>
+> ```
+> internal/mq/
+> ├── publisher.go          # RabbitMQ publisher with priority routing
+> └── consumer.go           # Consumer with exponential backoff retry
+>
+> internal/cache/
+> ├── cache.go              # Cache interface
+> ├── redis.go              # Redis implementation
+> └── noop.go               # NoOp + MemoryCache implementations
+>
+> internal/api/handlers/
+> └── cached.go             # Cached handlers for dashboard
+>
+> internal/repository/postgres/
+> └── business_listing.go   # Normalized data repository
+>
+> runner/managerrunner/migrations/
+> └── 0004_normalized_business_listings.up.sql  # Tables + trigger + backfill
+> ```
+>
+> ## Architecture (Final)
+>
+> - `business_listings` table: Normalized fields from results.data JSONB
+> - `emails` table: Deduplicated with validation metadata (api_score, api_status, is_acceptable)
+> - `business_emails` junction: Many-to-many relationship
+> - Redis cache: Dashboard queries hit cache first, PostgreSQL fallback
+> - RabbitMQ: Priority-based job queues (critical, high, default, low)
 
 ---
 
@@ -54,14 +91,14 @@ max_time: number (seconds)     →  MaxTime    →  MaxTime   →  max_time INTE
 | All frontend fields mapped | ✅ PASS | All `JobCreatePayload` fields reach DB |
 | Database schema matches domain | ✅ PASS | Migration 0005 aligns with domain.Job |
 | Type conversions correct | ✅ PASS | `max_time: int(s)` → `Duration` → `INTERVAL` |
-| Redis queue integration | ✅ PASS | Jobs enqueued after DB insert |
-| **Bridge to gmaps_jobs** | ❌ MISSING | **This plan implements this** |
+| Redis queue integration | ✅ PASS | Jobs enqueued after DB insert via Asynq |
+| **Bridge to gmaps_jobs** | ✅ DONE | **Implemented in JobService.bridgeToGmapsJobs()** |
 
 ---
 
 ## Table of Contents
 
-1. [Target Architecture](#target-architecture-simplified)
+1. [Target Architecture](#target-architecture-full)
 2. [Background: Key Components Explained](#background-key-components-explained)
 3. [Problem Statement](#problem-statement)
 4. [Solution: Bridge Layer](#solution-bridge-layer)
@@ -75,73 +112,393 @@ max_time: number (seconds)     →  MaxTime    →  MaxTime   →  max_time INTE
 
 ---
 
-## Target Architecture (SIMPLIFIED)
+## Target Architecture (FULL)
 
 ```
-┌────────────────────────────────────────────────────────────────┐
-│              SIMPLIFIED ARCHITECTURE (NO RABBITMQ)             │
-├────────────────────────────────────────────────────────────────┤
-│                                                                │
-│  ┌─────────────────┐     REST API     ┌─────────────────┐     │
-│  │     Dashboard   │─────────────────►│     Manager     │     │
-│  │   (React/Vite)  │                  │    (Go API)     │     │
-│  └─────────────────┘                  └────────┬────────┘     │
-│                                                │               │
-│                                    1. Create parent job       │
-│                                       in jobs_queue           │
-│                                                │               │
-│                                    2. Create seed jobs        │
-│                                       using CreateSeedJobs()  │
-│                                                │               │
-│                                    3. INSERT to gmaps_jobs    │
-│                                       (GOB encoded)           │
-│                                                ▼               │
-│                               ┌────────────────────────────┐  │
-│                               │       gmaps_jobs           │  │
-│                               │   (PostgreSQL table)       │  │
-│                               │                            │  │
-│                               │  • id (UUID)               │  │
-│                               │  • priority (INT)          │  │
-│                               │  • payload_type (VARCHAR)  │  │
-│                               │  • payload (BYTEA/GOB)     │  │
-│                               │  • status (new/queued)     │  │
-│                               │  • parent_job_id (NEW!)    │  │
-│                               │  • created_at              │  │
-│                               └─────────────┬──────────────┘  │
-│                                             │                  │
-│                            Polling (50-300ms backoff)         │
-│                               FOR UPDATE SKIP LOCKED          │
-│                                             │                  │
-│            ┌────────────────────────────────┼─────────────────┤
-│            │                                │                 │
-│            ▼                                ▼                 │
-│  ┌─────────────────┐              ┌─────────────────┐        │
-│  │  DSN Worker 1   │              │  DSN Worker N   │        │
-│  │  (UNCHANGED!)   │              │  (UNCHANGED!)   │        │
-│  └────────┬────────┘              └────────┬────────┘        │
-│           │                                │                  │
-│           │         ┌──────────────────────┘                  │
-│           │         │                                         │
-│           ▼         ▼                                         │
-│      ┌─────────────────────┐                                  │
-│      │   Email Extraction  │                                  │
-│      │   (if enabled)      │                                  │
-│      └──────────┬──────────┘                                  │
-│                 │                                              │
-│                 ▼                                              │
-│      ┌─────────────────────┐                                  │
-│      │     Moribouncer     │◄── External Email Validation    │
-│      │   Validation API    │    • Is deliverable?            │
-│      └──────────┬──────────┘    • Is disposable?             │
-│                 │               • Quality score              │
-│                 ▼                                              │
-│        ┌─────────────────┐                                    │
-│        │     results     │                                    │
-│        │   (PostgreSQL)  │                                    │
-│        └─────────────────┘                                    │
-│                                                               │
-└───────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────────┐
+│                    FULL ARCHITECTURE (REDIS + ASYNQ + POSTGRESQL)                    │
+├──────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                      │
+│  ┌─────────────────┐      REST API      ┌─────────────────┐                         │
+│  │     Dashboard   │───────────────────►│     Manager     │                         │
+│  │   (React/Vite)  │                    │    (Go API)     │                         │
+│  └─────────────────┘                    └────────┬────────┘                         │
+│                                                  │                                   │
+│                                      1. Create parent job                           │
+│                                         in jobs_queue (PostgreSQL)                  │
+│                                                  │                                   │
+│                                      2. Create seed jobs                            │
+│                                         using CreateSeedJobsFromKeywords()          │
+│                                                  │                                   │
+│                                      3. INSERT to gmaps_jobs                        │
+│                                         (GOB encoded, PostgreSQL)                   │
+│                                                  │                                   │
+│                                      4. Enqueue to Redis via Asynq                  │
+│                                         (job_id + priority)                         │
+│                                                  │                                   │
+│                    ┌─────────────────────────────┴─────────────────────────────┐    │
+│                    │                                                           │    │
+│                    ▼                                                           ▼    │
+│      ┌─────────────────────────┐                            ┌─────────────────────┐ │
+│      │     Redis + Asynq      │                            │     PostgreSQL      │ │
+│      │    (Job Queue)         │                            │   (Data Storage)    │ │
+│      │                        │                            │                     │ │
+│      │  • Priority queues     │                            │  • jobs_queue       │ │
+│      │  • Reliable delivery   │                            │  • gmaps_jobs       │ │
+│      │  • Auto-retry (3x)     │                            │  • results          │ │
+│      │  • Dead letter queue   │                            │  • Persistent       │ │
+│      │  • Deduplication       │                            │                     │ │
+│      └───────────┬────────────┘                            └─────────────────────┘ │
+│                  │                                                                  │
+│    ┌─────────────┼─────────────────────────────────────────┐                       │
+│    │             ▼                                         │                       │
+│    │   ┌─────────────────────────────────────────────┐    │                       │
+│    │   │         Asynq Worker Pool                    │    │                       │
+│    │   │       (internal/queue/worker.go)             │    │                       │
+│    │   │                                              │    │                       │
+│    │   │  Queues with priority:                       │    │                       │
+│    │   │  • critical (priority >= 10)                 │    │                       │
+│    │   │  • high     (priority >= 5)                  │    │                       │
+│    │   │  • default  (priority 0-4)                   │    │                       │
+│    │   │  • low      (priority < 0)                   │    │                       │
+│    │   └──────────────────────┬───────────────────────┘    │                       │
+│    │                          │                            │                       │
+│    │         ┌────────────────┼────────────────┐          │                       │
+│    │         │                │                │          │                       │
+│    │         ▼                ▼                ▼          │                       │
+│    │   ┌──────────┐    ┌──────────┐    ┌──────────┐      │                       │
+│    │   │ Worker 1 │    │ Worker 2 │    │ Worker N │      │                       │
+│    │   │ (consumer)│    │ (consumer)│    │ (consumer)│    │                       │
+│    │   └────┬─────┘    └────┬─────┘    └────┬─────┘      │                       │
+│    │        │               │               │             │                       │
+│    │        │    5. Consume from Asynq queue              │                       │
+│    │        │       (ACK after success)                   │                       │
+│    │        │               │               │             │                       │
+│    │        ▼               ▼               ▼             │                       │
+│    │   ┌─────────────────────────────────────────────┐    │                       │
+│    │   │  6. Fetch full job payload from gmaps_jobs  │    │                       │
+│    │   │     SELECT * FROM gmaps_jobs WHERE id = ?   │    │                       │
+│    │   │     FOR UPDATE SKIP LOCKED                  │    │                       │
+│    │   └─────────────────────────────────────────────┘    │                       │
+│    │                                                       │                       │
+│    └───────────────────────────────────────────────────────┘                       │
+│                                                                                     │
+│                        7. Process & Scrape Google Maps                             │
+│                                     │                                               │
+│                                     ▼                                               │
+│                      ┌─────────────────────────┐                                   │
+│                      │    Email Extraction     │                                   │
+│                      │    (if enabled)         │                                   │
+│                      └───────────┬─────────────┘                                   │
+│                                  │                                                  │
+│                                  ▼                                                  │
+│               ┌─────────────────────────────────────────┐                          │
+│               │     LOCAL EMAIL VALIDATION (FREE)       │                          │
+│               │                                         │                          │
+│               │  • Format validation (length, @, .)     │                          │
+│               │  • Placeholder domains (example.com)    │                          │
+│               │  • Noreply/donotreply patterns          │                          │
+│               └───────────────┬─────────────────────────┘                          │
+│                               │                                                     │
+│                               │ Pass local validation?                             │
+│                               │                                                     │
+│                    ┌──────────┴──────────┐                                         │
+│                    │                     │                                         │
+│                    ▼                     ▼                                         │
+│               ┌─────────┐          ┌─────────┐                                     │
+│               │   YES   │          │   NO    │                                     │
+│               └────┬────┘          └────┬────┘                                     │
+│                    │                    │                                           │
+│                    ▼                    ▼                                           │
+│      ┌─────────────────────┐      ┌─────────────┐                                  │
+│      │     Moribouncer     │      │   REJECT    │                                  │
+│      │   (if API key set)  │      │ (skip email)│                                  │
+│      └──────────┬──────────┘      └─────────────┘                                  │
+│                 │                                                                   │
+│                 ▼                                                                   │
+│       ┌─────────────────────┐                                                      │
+│       │       results       │                                                      │
+│       │    (PostgreSQL)     │                                                      │
+│       └──────────┬──────────┘                                                      │
+│                  │                                                                  │
+│                  ▼                                                                  │
+│       8. Update parent job progress                                                │
+│          via syncAllParentProgress()                                               │
+│                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────┘
 ```
+
+### Component Responsibilities
+
+| Component | Technology | Responsibilities |
+|-----------|------------|------------------|
+| **Dashboard** | React/Vite | UI, job creation, monitoring |
+| **Manager** | Go API | REST API, bridge jobs, orchestration |
+| **Redis + Asynq** | Job Queue | Job distribution, priority routing, auto-retry |
+| **PostgreSQL** | Database | Persistent storage: jobs_queue, gmaps_jobs, results |
+| **Workers** | Go consumers | Scrape Google Maps, extract emails, write results |
+
+### Redis + Asynq Configuration
+
+```
+Queues (internal/queue/queue.go):
+├── critical  (priority >= 10) - highest priority
+├── high      (priority >= 5)
+├── default   (priority 0-4)   - normal jobs
+└── low       (priority < 0)   - background jobs
+
+Settings:
+├── MaxRetry: 3              - auto-retry failed jobs
+├── Timeout: 30 minutes      - per job timeout
+└── Retention: 24 hours      - keep completed tasks
+```
+
+### Redis Usage
+
+```
+Keys:
+├── asynq:*                     → Asynq internal keys (queues, tasks)
+├── dedup:place:{cid}           → Place deduplication (TTL: 24h)
+└── dedup:email:{hash}          → Email deduplication (TTL: 7d)
+```
+│                    │                                                           │    │
+│                    ▼                                                           ▼    │
+│      ┌─────────────────────────┐                            ┌─────────────────────┐ │
+│      │        RabbitMQ         │                            │        Redis        │ │
+│      │   (Message Broker)      │                            │    (Cache/Session)  │ │
+│      │                         │                            │                     │ │
+│      │  • Job Queue (durable)  │                            │  • Session store    │ │
+│      │  • Dead Letter Queue    │                            │  • Rate limiting    │ │
+│      │  • Priority routing     │                            │  • Fast lookups     │ │
+│      │  • Guaranteed delivery  │                            │  • Pub/Sub notify   │ │
+│      │  • Message persistence  │                            │  • Dedup cache      │ │
+│      └───────────┬─────────────┘                            └─────────────────────┘ │
+│                  │                                                                   │
+│      4. PUBLISH job to RabbitMQ                                                     │
+│         (with job_id, priority)                                                     │
+│                  │                                                                   │
+│    ┌─────────────┼─────────────────────────────────────────┐                        │
+│    │             │                                         │                        │
+│    │             ▼                                         │                        │
+│    │   ┌─────────────────────────────────────────────┐    │                        │
+│    │   │           RabbitMQ Exchange                  │    │                        │
+│    │   │       (gmaps.jobs.exchange)                  │    │                        │
+│    │   │                                              │    │                        │
+│    │   │  Routing Keys:                               │    │                        │
+│    │   │  • priority.high   → high_priority_queue    │    │                        │
+│    │   │  • priority.normal → normal_queue           │    │                        │
+│    │   │  • priority.low    → low_priority_queue     │    │                        │
+│    │   └──────────────────────┬───────────────────────┘    │                        │
+│    │                          │                            │                        │
+│    │         ┌────────────────┼────────────────┐          │                        │
+│    │         │                │                │          │                        │
+│    │         ▼                ▼                ▼          │                        │
+│    │   ┌──────────┐    ┌──────────┐    ┌──────────┐      │                        │
+│    │   │ Worker 1 │    │ Worker 2 │    │ Worker N │      │                        │
+│    │   │ (consumer)│    │ (consumer)│    │ (consumer)│      │                        │
+│    │   └────┬─────┘    └────┬─────┘    └────┬─────┘      │                        │
+│    │        │               │               │             │                        │
+│    │        │    5. Consume message from RabbitMQ        │                        │
+│    │        │       (ACK after success, NACK on fail)    │                        │
+│    │        │               │               │             │                        │
+│    │        ▼               ▼               ▼             │                        │
+│    │   ┌─────────────────────────────────────────────┐    │                        │
+│    │   │  6. Fetch full job payload from gmaps_jobs  │    │                        │
+│    │   │     SELECT * FROM gmaps_jobs WHERE id = ?   │    │                        │
+│    │   │     FOR UPDATE SKIP LOCKED                  │    │                        │
+│    │   └─────────────────────────────────────────────┘    │                        │
+│    │                                                       │                        │
+│    └───────────────────────────────────────────────────────┘                        │
+│                                                                                      │
+│                               ┌─────────────────────────────┐                       │
+│                               │       gmaps_jobs            │                       │
+│                               │    (PostgreSQL table)       │                       │
+│                               │                             │                       │
+│                               │  • id (UUID)                │                       │
+│                               │  • priority (INT)           │                       │
+│                               │  • payload_type (VARCHAR)   │                       │
+│                               │  • payload (BYTEA/GOB)      │                       │
+│                               │  • status (new/queued/done) │                       │
+│                               │  • parent_job_id (NEW!)     │                       │
+│                               │  • created_at               │                       │
+│                               │  • updated_at               │                       │
+│                               └─────────────────────────────┘                       │
+│                                                                                      │
+│                        7. Process & Scrape Google Maps                              │
+│                                     │                                                │
+│                                     ▼                                                │
+│                      ┌─────────────────────────┐                                    │
+│                      │    Email Extraction     │                                    │
+│                      │    (if enabled)         │                                    │
+│                      └───────────┬─────────────┘                                    │
+│                                  │                                                   │
+│                                  ▼                                                   │
+│               ┌─────────────────────────────────────────┐                           │
+│               │     LOCAL EMAIL VALIDATION (FREE)       │                           │
+│               │                                         │                           │
+│               │  • Format validation (length, @, .)     │                           │
+│               │  • Placeholder domains (example.com)    │                           │
+│               │  • Sentry emails (*@sentry.io)          │                           │
+│               │  • Trapmail patterns                    │                           │
+│               │  • Honeypot domains                     │                           │
+│               │  • Noreply/donotreply patterns          │                           │
+│               │  • Privacy relay (privaterelay.apple)   │                           │
+│               └───────────────┬─────────────────────────┘                           │
+│                               │                                                      │
+│                               │ Pass local validation?                              │
+│                               │                                                      │
+│                    ┌──────────┴──────────┐                                          │
+│                    │                     │                                          │
+│                    ▼                     ▼                                          │
+│               ┌─────────┐          ┌─────────┐                                      │
+│               │   YES   │          │   NO    │                                      │
+│               └────┬────┘          └────┬────┘                                      │
+│                    │                    │                                            │
+│                    ▼                    ▼                                            │
+│      ┌─────────────────────┐      ┌─────────────┐                                   │
+│      │     Moribouncer     │      │   REJECT    │                                   │
+│      │   Validation API    │      │ (skip email)│                                   │
+│      │                     │      └─────────────┘                                   │
+│      │ • Is deliverable?   │                                                        │
+│      │ • Is disposable?    │                                                        │
+│      │ • Quality score     │                                                        │
+│      └──────────┬──────────┘                                                        │
+│                 │                                                                    │
+│                 ▼                                                                    │
+│       ┌─────────────────────┐                                                       │
+│       │       results       │                                                       │
+│       │    (PostgreSQL)     │                                                       │
+│       └──────────┬──────────┘                                                       │
+│                  │                                                                   │
+│                  ▼                                                                   │
+│       8. Update parent job progress                                                 │
+│          in jobs_queue                                                              │
+│                  │                                                                   │
+│                  ▼                                                                   │
+│       ┌─────────────────────┐                                                       │
+│       │  9. Notify via Redis │                                                       │
+│       │  (Pub/Sub to Dashboard)│                                                     │
+│       └─────────────────────┘                                                       │
+│                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Component Responsibilities
+
+| Component | Technology | Responsibilities |
+|-----------|------------|------------------|
+| **Dashboard** | React/Vite | UI, job creation, monitoring |
+| **Manager** | Go API | REST API, bridge jobs, orchestration |
+| **RabbitMQ** | Message Broker | Job distribution, guaranteed delivery, priority routing |
+| **Redis** | Cache/Session | Session store, rate limiting, pub/sub notifications, dedup cache |
+| **PostgreSQL** | Database | Persistent storage: jobs_queue, gmaps_jobs, results |
+| **Workers** | Go consumers | Scrape Google Maps, extract emails, write results |
+
+### RabbitMQ Configuration
+
+```
+Exchange:     gmaps.jobs.exchange (topic)
+              │
+              ├── Routing Key: priority.high
+              │   └── Queue: gmaps.jobs.high (prefetch=1, durable)
+              │
+              ├── Routing Key: priority.normal
+              │   └── Queue: gmaps.jobs.normal (prefetch=2, durable)
+              │
+              └── Routing Key: priority.low
+                  └── Queue: gmaps.jobs.low (prefetch=4, durable)
+
+Dead Letter:  gmaps.jobs.dlx (exchange)
+              └── gmaps.jobs.dead (queue) - for failed jobs after retries
+```
+
+### Redis Usage
+
+```
+Keys:
+├── session:{user_id}           → User session data (TTL: 24h)
+├── ratelimit:{ip}              → Rate limiting counter (TTL: 1min)
+├── dedup:email:{hash}          → Email deduplication (TTL: 7d)
+├── cache:job:{job_id}          → Job cache for fast lookups (TTL: 1h)
+└── pubsub:job_progress         → Real-time progress notifications
+
+Pub/Sub Channels:
+├── job:created                 → New job notifications
+├── job:progress:{job_id}       → Progress updates
+└── job:completed:{job_id}      → Completion notifications
+```
+
+### Message Flow (Detail)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                       RABBITMQ + REDIS MESSAGE FLOW                                 │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                     │
+│   Manager (Producer)                          Workers (Consumers)                   │
+│   ──────────────────                          ───────────────────                   │
+│                                                                                     │
+│   1. Receive job request                                                            │
+│      from Dashboard                                                                 │
+│           │                                                                         │
+│           ▼                                                                         │
+│   2. INSERT to jobs_queue                                                           │
+│      (PostgreSQL - parent job)                                                      │
+│           │                                                                         │
+│           ▼                                                                         │
+│   3. For each keyword:                                                              │
+│      INSERT to gmaps_jobs                                                           │
+│      (PostgreSQL - child jobs)                                                      │
+│           │                                                                         │
+│           ▼                                                                         │
+│   4. PUBLISH to RabbitMQ ─────────────────────────►  5. CONSUME from RabbitMQ      │
+│      Exchange: gmaps.jobs.exchange                      Queue: gmaps.jobs.*        │
+│      Routing: priority.{level}                               │                      │
+│      Payload: {job_id, priority}                             │                      │
+│           │                                                  ▼                      │
+│           │                                          6. ACK/NACK message            │
+│           ▼                                                  │                      │
+│   5. PUBLISH to Redis ───────────────────────────►          │                      │
+│      Channel: job:created                                    ▼                      │
+│      (for Dashboard real-time)                       7. Fetch from gmaps_jobs       │
+│                                                         (PostgreSQL)                │
+│                                                              │                      │
+│                                                              ▼                      │
+│                                                      8. Process & Scrape            │
+│                                                              │                      │
+│                                                              ▼                      │
+│                                                      9. Write to results            │
+│                                                         (PostgreSQL)                │
+│                                                              │                      │
+│                                                              ▼                      │
+│                                                     10. Update gmaps_jobs           │
+│                                                         status = 'done'             │
+│   ◄──────────────────────────────────────────────────       │                      │
+│   11. SUBSCRIBE Redis                                        ▼                      │
+│       Channel: job:progress:{id}               11. PUBLISH to Redis                │
+│       (Dashboard receives update)                  Channel: job:progress:{id}       │
+│                                                                                     │
+│                                                                                     │
+│   RabbitMQ Commands:                          Redis Commands:                       │
+│   • channel.Publish(exchange, routingKey)     • PUBLISH job:progress:{id} data     │
+│   • channel.Consume(queue, consumer)          • SUBSCRIBE job:progress:{id}        │
+│   • msg.Ack() / msg.Nack()                    • SET cache:job:{id} data EX 3600    │
+│                                               • GET cache:job:{id}                  │
+│                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Why RabbitMQ + Redis (Not Either/Or)
+
+| Aspect | RabbitMQ | Redis | Combined Benefit |
+|--------|----------|-------|------------------|
+| **Job Queue** | ✅ Durable queues, guaranteed delivery | ❌ Loss risk on crash | Reliable job processing |
+| **Priority** | ✅ Priority queues, routing | ❌ Manual implementation | Built-in priority support |
+| **Dead Letters** | ✅ DLX for failed jobs | ❌ No built-in | Automatic retry/failure handling |
+| **Real-time** | ❌ Not designed for this | ✅ Pub/Sub, fast | Live dashboard updates |
+| **Caching** | ❌ Not a cache | ✅ In-memory, fast | Fast lookups, rate limiting |
+| **Session** | ❌ Not for sessions | ✅ TTL, atomic | User session management |
+| **Dedup** | ❌ Not for this | ✅ SET NX, TTL | Prevent duplicate processing |
 
 ---
 

@@ -88,11 +88,14 @@ type Config struct {
 	// StaticFolder is the path to static frontend files
 	StaticFolder string
 
-	// Redis configuration for job queue
+	// Redis configuration for cache and deduplication
 	RedisURL  string
 	RedisAddr string
 	RedisPass string
 	RedisDB   int
+
+	// RabbitMQ configuration for job queue
+	RabbitMQURL string
 
 	// ProxyGate flags
 	ProxyGateEnabled         bool
@@ -165,6 +168,9 @@ func ParseConfig() *Config {
 	flag.StringVar(&cfg.RedisAddr, "redis-addr", "", "Redis address (host:port)")
 	flag.StringVar(&cfg.RedisPass, "redis-pass", "", "Redis password")
 	flag.IntVar(&cfg.RedisDB, "redis-db", 0, "Redis database number")
+
+	// RabbitMQ flags
+	flag.StringVar(&cfg.RabbitMQURL, "rabbitmq-url", "", "RabbitMQ connection URL (amqp://user:pass@host:port/vhost)")
 
 	// ProxyGate flags
 	flag.BoolVar(&cfg.ProxyGateEnabled, "proxygate", false, "enable embedded proxy gateway")

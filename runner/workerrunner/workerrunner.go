@@ -23,11 +23,14 @@ type Config struct {
 	// RunnerConfig is the scraping configuration
 	RunnerConfig *runner.Config
 
-	// Redis configuration for job queue
+	// Redis configuration for cache and deduplication
 	RedisURL  string
 	RedisAddr string
 	RedisPass string
 	RedisDB   int
+
+	// RabbitMQ configuration for job queue (preferred over Redis)
+	RabbitMQURL string
 }
 
 // WorkerRunner runs a worker that claims and processes jobs
@@ -63,6 +66,7 @@ func New(cfg *Config) (runner.Runner, error) {
 		RedisAddr:    cfg.RedisAddr,
 		RedisPass:    cfg.RedisPass,
 		RedisDB:      cfg.RedisDB,
+		RabbitMQURL:  cfg.RabbitMQURL,
 	}
 
 	r, err := worker.NewRunner(workerCfg)

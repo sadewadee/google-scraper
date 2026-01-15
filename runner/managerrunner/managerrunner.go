@@ -17,9 +17,11 @@ import (
 
 	"github.com/sadewadee/google-scraper/internal/api"
 	"github.com/sadewadee/google-scraper/internal/api/handlers"
+	"github.com/sadewadee/google-scraper/internal/cache"
 	"github.com/sadewadee/google-scraper/internal/domain"
 	"github.com/sadewadee/google-scraper/internal/heartbeat"
 	"github.com/sadewadee/google-scraper/internal/migration"
+	"github.com/sadewadee/google-scraper/internal/mq"
 	"github.com/sadewadee/google-scraper/internal/proxygate"
 	"github.com/sadewadee/google-scraper/internal/queue"
 	"github.com/sadewadee/google-scraper/internal/repository/postgres"
@@ -47,11 +49,14 @@ type Config struct {
 	// DataFolder is where to store temporary files
 	DataFolder string
 
-	// Redis configuration for job queue
+	// Redis configuration for job queue and cache
 	RedisURL  string
 	RedisAddr string
 	RedisPass string
 	RedisDB   int
+
+	// RabbitMQ configuration for job queue
+	RabbitMQURL string
 }
 
 // ManagerRunner runs the manager (Web UI + API) without scraping
@@ -66,6 +71,8 @@ type ManagerRunner struct {
 	hbMonitor *heartbeat.Monitor
 	proxyGate *proxygate.ProxyGate
 	jobQueue  *queue.Queue
+	mqPub     mq.Publisher
+	cache     cache.Cache
 }
 
 // New creates a new ManagerRunner
@@ -161,6 +168,7 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 
 	// Initialize Redis queue (optional - gracefully handles missing Redis)
 	var jobQueue *queue.Queue
+	var redisCache cache.Cache
 	if cfg.RedisURL != "" || cfg.RedisAddr != "" {
 		queueCfg := &queue.Config{
 			RedisURL:  cfg.RedisURL,
@@ -176,8 +184,52 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 			jobQueue = q
 			log.Println("manager: Redis queue connected")
 		}
+
+		// Initialize Redis cache (uses same Redis instance)
+		cacheCfg := cache.Config{
+			Addr:     cfg.RedisAddr,
+			Password: cfg.RedisPass,
+			DB:       cfg.RedisDB,
+		}
+		// If RedisURL is specified but not Addr, parse the URL
+		if cfg.RedisAddr == "" && cfg.RedisURL != "" {
+			// Parse redis://user:pass@host:port/db format
+			// For now, just log and skip (RedisAddr should be preferred)
+			log.Printf("manager: Redis URL format not supported for cache, use -redis-addr")
+		}
+		if cfg.RedisAddr != "" {
+			c, err := cache.NewRedisCache(cacheCfg)
+			if err != nil {
+				log.Printf("manager: WARNING - failed to connect to Redis cache: %v", err)
+				log.Println("manager: continuing without caching (slower dashboard)")
+				redisCache = cache.NewNoOpCache()
+			} else {
+				redisCache = c
+				log.Println("manager: Redis cache connected")
+			}
+		} else {
+			log.Println("manager: Redis cache not configured (no address)")
+			redisCache = cache.NewNoOpCache()
+		}
 	} else {
 		log.Println("manager: no Redis configured, workers will use HTTP polling")
+		log.Println("manager: no Redis configured, using no-op cache (slower dashboard)")
+		redisCache = cache.NewNoOpCache()
+	}
+
+	// Initialize RabbitMQ publisher (optional)
+	var mqPublisher mq.Publisher
+	if cfg.RabbitMQURL != "" {
+		pub, err := mq.NewPublisher(mq.Config{URL: cfg.RabbitMQURL})
+		if err != nil {
+			log.Printf("manager: WARNING - failed to connect to RabbitMQ: %v", err)
+			log.Println("manager: continuing without RabbitMQ (fallback to Redis queue if available)")
+		} else {
+			mqPublisher = pub
+			log.Println("manager: RabbitMQ publisher connected")
+		}
+	} else {
+		log.Println("manager: no RabbitMQ configured")
 	}
 
 	// Initialize services
@@ -185,8 +237,15 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 	if isPostgres {
 		// Use bridge to gmaps_jobs for DSN workers
 		gmapsPusher := gmapspostgres.NewGmapsJobPusher(db)
-		jobSvc = service.NewJobServiceWithBridge(jobRepo, resultRepo, jobQueue, gmapsPusher)
-		log.Println("manager: JobService initialized with DSN bridge (gmaps_jobs)")
+		if mqPublisher != nil {
+			// Use RabbitMQ publisher (preferred)
+			jobSvc = service.NewJobServiceWithMQ(jobRepo, resultRepo, mqPublisher, gmapsPusher)
+			log.Println("manager: JobService initialized with RabbitMQ + DSN bridge")
+		} else {
+			// Fallback to Redis queue
+			jobSvc = service.NewJobServiceWithBridge(jobRepo, resultRepo, jobQueue, gmapsPusher)
+			log.Println("manager: JobService initialized with Redis queue + DSN bridge")
+		}
 	} else {
 		// SQLite mode - no bridge (deprecated mode)
 		jobSvc = service.NewJobService(jobRepo, resultRepo, jobQueue)
@@ -198,12 +257,39 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 
 	log.Println("manager: services initialized, setting up router...")
 
-	// Initialize handlers
-	jobHandler := handlers.NewJobHandler(jobSvc, resultSvc)
+	// Initialize handlers with caching
+	// Use cached handlers for read operations to reduce database load
+	var jobHandler *handlers.JobHandler
+	var statsHandler *handlers.StatsHandler
+	var resultHandler *handlers.ResultHandler
+
+	// Cached handlers for read operations
+	var cachedJobHandler *handlers.CachedJobHandler
+	var cachedStatsHandler *handlers.CachedStatsHandler
+	var cachedResultHandler *handlers.CachedResultHandler
+
+	// Check if we have a real cache (not no-op)
+	_, isNoOpCache := redisCache.(*cache.NoOpCache)
+	if isNoOpCache {
+		// No caching - use standard handlers
+		jobHandler = handlers.NewJobHandler(jobSvc, resultSvc)
+		statsHandler = handlers.NewStatsHandler(statsSvc)
+		resultHandler = handlers.NewResultHandler(resultSvc)
+		log.Println("manager: using standard handlers (no cache)")
+	} else {
+		// Use standard handlers for write operations
+		jobHandler = handlers.NewJobHandlerWithCache(jobSvc, resultSvc, redisCache)
+		statsHandler = handlers.NewStatsHandler(statsSvc)
+		resultHandler = handlers.NewResultHandler(resultSvc)
+
+		// Create cached handlers for read operations
+		cachedJobHandler = handlers.NewCachedJobHandler(jobSvc, resultSvc, redisCache)
+		cachedStatsHandler = handlers.NewCachedStatsHandler(statsSvc, redisCache)
+		cachedResultHandler = handlers.NewCachedResultHandler(resultSvc, redisCache)
+		log.Println("manager: using cached handlers for dashboard read operations")
+	}
 	workerHandler := handlers.NewWorkerHandler(workerSvc)
-	statsHandler := handlers.NewStatsHandler(statsSvc)
 	proxyHandler := handlers.NewProxyHandler(pg, proxyRepo)
-	resultHandler := handlers.NewResultHandler(resultSvc)
 
 	// Load sources if proxyRepo is available
 	if proxyRepo != nil && pg != nil {
@@ -231,6 +317,11 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 
 	// Setup router
 	router := api.NewRouter(jobHandler, workerHandler, statsHandler, proxyHandler, resultHandler)
+
+	// Set cached handlers for read operations if available
+	if cachedJobHandler != nil || cachedStatsHandler != nil || cachedResultHandler != nil {
+		router.SetCachedHandlers(cachedJobHandler, cachedStatsHandler, cachedResultHandler)
+	}
 	apiToken := os.Getenv("API_TOKEN")
 	if apiToken == "" {
 		apiToken = os.Getenv("API_KEY")
@@ -309,6 +400,8 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 		hbMonitor: hbMonitor,
 		proxyGate: pg,
 		jobQueue:  jobQueue,
+		mqPub:     mqPublisher,
+		cache:     redisCache,
 	}, nil
 }
 
@@ -331,6 +424,12 @@ func (m *ManagerRunner) Run(ctx context.Context) error {
 
 // Close cleans up resources
 func (m *ManagerRunner) Close(_ context.Context) error {
+	if m.mqPub != nil {
+		m.mqPub.Close()
+	}
+	if m.cache != nil {
+		m.cache.Close()
+	}
 	if m.jobQueue != nil {
 		m.jobQueue.Close()
 	}

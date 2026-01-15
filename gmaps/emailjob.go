@@ -98,6 +98,7 @@ func (j *EmailExtractJob) Process(ctx context.Context, resp *scrapemate.Response
 	// If validation is enabled, validate emails
 	if j.Validator != nil && len(emails) > 0 {
 		var validatedEmails []string
+		var validations []EmailValidation
 		for _, email := range emails {
 			res, err := j.Validator.Validate(ctx, email)
 			if err != nil {
@@ -108,8 +109,27 @@ func (j *EmailExtractJob) Process(ctx context.Context, resp *scrapemate.Response
 				// but if we get a result, we check ShouldAccept.
 				log.Error("Email validation failed", "email", email, "error", err)
 				validatedEmails = append(validatedEmails, email)
+				// Store with api_error status
+				validations = append(validations, EmailValidation{
+					Email:  email,
+					Status: "api_error",
+					Reason: err.Error(),
+				})
 				continue
 			}
+
+			// Store validation result regardless of acceptance
+			validations = append(validations, EmailValidation{
+				Email:       res.Email,
+				Status:      res.Status,
+				Score:       res.Score,
+				Deliverable: res.Deliverable,
+				Disposable:  res.Disposable,
+				RoleAccount: res.RoleAccount,
+				FreeEmail:   res.FreeEmail,
+				CatchAll:    res.CatchAll,
+				Reason:      res.Reason,
+			})
 
 			if res.ShouldAccept() {
 				validatedEmails = append(validatedEmails, email)
@@ -118,6 +138,7 @@ func (j *EmailExtractJob) Process(ctx context.Context, resp *scrapemate.Response
 			}
 		}
 		emails = validatedEmails
+		j.Entry.EmailValidations = validations
 	}
 
 	j.Entry.Emails = emails

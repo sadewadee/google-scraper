@@ -128,6 +128,7 @@ func runnerFactory(cfg *runner.Config, pg *proxygate.ProxyGate) (runner.Runner, 
 			RedisAddr:    cfg.RedisAddr,
 			RedisPass:    cfg.RedisPass,
 			RedisDB:      cfg.RedisDB,
+			RabbitMQURL:  cfg.RabbitMQURL,
 		}, pg)
 	case runner.RunModeWorker:
 		return workerrunner.New(&workerrunner.Config{
@@ -138,6 +139,7 @@ func runnerFactory(cfg *runner.Config, pg *proxygate.ProxyGate) (runner.Runner, 
 			RedisAddr:    cfg.RedisAddr,
 			RedisPass:    cfg.RedisPass,
 			RedisDB:      cfg.RedisDB,
+			RabbitMQURL:  cfg.RabbitMQURL,
 		})
 	default:
 		return nil, fmt.Errorf("%w: %d", runner.ErrInvalidRunMode, cfg.RunMode)

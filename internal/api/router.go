@@ -14,6 +14,11 @@ type Router struct {
 	stats   *handlers.StatsHandler
 	proxy   *handlers.ProxyHandler
 	results *handlers.ResultHandler
+
+	// Cached handlers for read operations (optional, set via SetCachedHandlers)
+	cachedJobs    *handlers.CachedJobHandler
+	cachedStats   *handlers.CachedStatsHandler
+	cachedResults *handlers.CachedResultHandler
 }
 
 // NewRouter creates a new Router
@@ -34,14 +39,29 @@ func NewRouter(
 	}
 }
 
+// SetCachedHandlers sets optional cached handlers for read operations
+func (r *Router) SetCachedHandlers(
+	cachedJobs *handlers.CachedJobHandler,
+	cachedStats *handlers.CachedStatsHandler,
+	cachedResults *handlers.CachedResultHandler,
+) {
+	r.cachedJobs = cachedJobs
+	r.cachedStats = cachedStats
+	r.cachedResults = cachedResults
+}
+
 // Setup configures all routes
 func (r *Router) Setup(token string) http.Handler {
 	// Health check endpoint (no auth required)
 	r.mux.HandleFunc("/health", r.healthCheck)
 	r.mux.HandleFunc("/api/v2/health", r.healthCheck)
 
-	// Stats endpoint
-	r.mux.HandleFunc("/api/v2/stats", r.stats.GetDashboardStats)
+	// Stats endpoint - use cached handler if available
+	if r.cachedStats != nil {
+		r.mux.HandleFunc("/api/v2/stats", r.cachedStats.GetDashboardStats)
+	} else {
+		r.mux.HandleFunc("/api/v2/stats", r.stats.GetDashboardStats)
+	}
 
 	// ProxyGate endpoints
 	r.mux.HandleFunc("/api/v2/proxygate/stats", r.proxy.GetStats)
@@ -51,7 +71,7 @@ func (r *Router) Setup(token string) http.Handler {
 
 	// Job endpoints
 	r.mux.HandleFunc("/api/v2/jobs", r.handleJobs)
-	r.mux.HandleFunc("/api/v2/jobs/stats", r.jobs.GetStats)
+	r.mux.HandleFunc("/api/v2/jobs/stats", r.handleJobStats)
 	r.mux.HandleFunc("/api/v2/jobs/{id}", r.handleJob)
 	r.mux.HandleFunc("/api/v2/jobs/{id}/pause", r.jobs.Pause)
 	r.mux.HandleFunc("/api/v2/jobs/{id}/resume", r.jobs.Resume)
@@ -70,8 +90,12 @@ func (r *Router) Setup(token string) http.Handler {
 	r.mux.HandleFunc("/api/v2/workers/{id}/fail", r.workers.FailJob)
 	r.mux.HandleFunc("/api/v2/workers/{id}/release", r.workers.ReleaseJob)
 
-	// Global results endpoints (database view)
-	r.mux.HandleFunc("/api/v2/results", r.results.List)
+	// Global results endpoints (database view) - use cached handler if available
+	if r.cachedResults != nil {
+		r.mux.HandleFunc("/api/v2/results", r.cachedResults.List)
+	} else {
+		r.mux.HandleFunc("/api/v2/results", r.results.List)
+	}
 	r.mux.HandleFunc("/api/v2/results/download", r.results.Download)
 
 	// Apply middleware
@@ -88,7 +112,12 @@ func (r *Router) Setup(token string) http.Handler {
 func (r *Router) handleJobs(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodGet:
-		r.jobs.List(w, req)
+		// Use cached handler for read operations if available
+		if r.cachedJobs != nil {
+			r.cachedJobs.List(w, req)
+		} else {
+			r.jobs.List(w, req)
+		}
 	case http.MethodPost:
 		r.jobs.Create(w, req)
 	default:
@@ -100,11 +129,26 @@ func (r *Router) handleJobs(w http.ResponseWriter, req *http.Request) {
 func (r *Router) handleJob(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodGet:
-		r.jobs.GetByID(w, req)
+		// Use cached handler for read operations if available
+		if r.cachedJobs != nil {
+			r.cachedJobs.GetByID(w, req)
+		} else {
+			r.jobs.GetByID(w, req)
+		}
 	case http.MethodDelete:
 		r.jobs.Delete(w, req)
 	default:
 		handlers.RenderError(w, http.StatusMethodNotAllowed, "Method not allowed")
+	}
+}
+
+// handleJobStats routes requests for /api/v2/jobs/stats
+func (r *Router) handleJobStats(w http.ResponseWriter, req *http.Request) {
+	// Use cached handler if available
+	if r.cachedJobs != nil {
+		r.cachedJobs.GetStats(w, req)
+	} else {
+		r.jobs.GetStats(w, req)
 	}
 }
 
@@ -155,7 +199,12 @@ func (r *Router) healthCheck(w http.ResponseWriter, req *http.Request) {
 func (r *Router) handleJobResults(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodGet:
-		r.jobs.GetResults(w, req)
+		// Use cached handler for read operations if available
+		if r.cachedJobs != nil {
+			r.cachedJobs.GetResults(w, req)
+		} else {
+			r.jobs.GetResults(w, req)
+		}
 	case http.MethodPost:
 		r.jobs.SubmitResults(w, req)
 	default:

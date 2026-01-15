@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/sadewadee/google-scraper/internal/domain"
+	"github.com/sadewadee/google-scraper/internal/mq"
 	"github.com/sadewadee/google-scraper/internal/queue"
 	"github.com/sadewadee/google-scraper/postgres"
 	"github.com/sadewadee/google-scraper/runner"
@@ -28,7 +29,8 @@ var (
 type JobService struct {
 	jobs      domain.JobRepository
 	results   domain.ResultRepository
-	queue     *queue.Queue
+	queue     *queue.Queue       // Redis queue (legacy)
+	mqPub     mq.Publisher       // RabbitMQ publisher (preferred)
 	gmapsPush postgres.GmapsJobPusher // Bridge to gmaps_jobs for DSN workers
 }
 
@@ -49,6 +51,17 @@ func NewJobServiceWithBridge(jobs domain.JobRepository, results domain.ResultRep
 		jobs:      jobs,
 		results:   results,
 		queue:     q,
+		gmapsPush: gmapsPush,
+	}
+}
+
+// NewJobServiceWithMQ creates a new JobService with RabbitMQ support.
+// This is the preferred constructor for Manager mode with RabbitMQ.
+func NewJobServiceWithMQ(jobs domain.JobRepository, results domain.ResultRepository, mqPub mq.Publisher, gmapsPush postgres.GmapsJobPusher) *JobService {
+	return &JobService{
+		jobs:      jobs,
+		results:   results,
+		mqPub:     mqPub,
 		gmapsPush: gmapsPush,
 	}
 }
@@ -86,8 +99,20 @@ func (s *JobService) Create(ctx context.Context, req *domain.CreateJobRequest) (
 		}
 	}
 
-	// Enqueue to Redis queue if available
-	if s.queue != nil {
+	// Enqueue to RabbitMQ if available (preferred over Redis)
+	if s.mqPub != nil {
+		msg := &mq.JobMessage{
+			JobID:    job.ID,
+			Priority: job.Priority,
+			Type:     "job:process",
+		}
+		if err := s.mqPub.Publish(ctx, msg); err != nil {
+			log.Printf("[JobService] WARNING: failed to publish job %s to RabbitMQ: %v", job.ID, err)
+		} else {
+			log.Printf("[JobService] Job %s published to RabbitMQ queue", job.ID)
+		}
+	} else if s.queue != nil {
+		// Fallback to Redis queue if RabbitMQ not available
 		if err := s.queue.Enqueue(ctx, job.ID, job.Priority); err != nil {
 			// Log error but don't fail job creation - worker can still poll
 			log.Printf("[JobService] WARNING: failed to enqueue job %s to Redis: %v", job.ID, err)
@@ -231,8 +256,20 @@ func (s *JobService) Resume(ctx context.Context, id uuid.UUID) (*domain.Job, err
 		return nil, fmt.Errorf("failed to resume job: %w", err)
 	}
 
-	// Re-enqueue to Redis queue if available
-	if s.queue != nil {
+	// Re-enqueue to RabbitMQ if available (preferred over Redis)
+	if s.mqPub != nil {
+		msg := &mq.JobMessage{
+			JobID:    job.ID,
+			Priority: job.Priority,
+			Type:     "job:process",
+		}
+		if err := s.mqPub.Publish(ctx, msg); err != nil {
+			log.Printf("[JobService] WARNING: failed to re-publish resumed job %s to RabbitMQ: %v", job.ID, err)
+		} else {
+			log.Printf("[JobService] Resumed job %s re-published to RabbitMQ queue", job.ID)
+		}
+	} else if s.queue != nil {
+		// Fallback to Redis queue
 		if err := s.queue.Enqueue(ctx, job.ID, job.Priority); err != nil {
 			log.Printf("[JobService] WARNING: failed to re-enqueue resumed job %s to Redis: %v", job.ID, err)
 		} else {

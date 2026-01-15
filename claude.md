@@ -46,13 +46,22 @@ main.go                 # Entry point, config parsing, runner initialization
 │   ├── runner.go       # Config struct and CLI flags
 │   ├── filerunner/     # CLI mode (input file → output file)
 │   ├── managerrunner/  # Web UI server and job management (Manager)
+│   ├── workerrunner/   # Worker mode (connects to Manager)
 │   ├── databaserunner/ # Distributed scraping with PostgreSQL
 │   └── lambdaaws/      # AWS Lambda execution
 ├── gmaps/              # Google Maps domain logic
 │   ├── entry.go        # Entry struct (business data model)
 │   ├── job.go          # Search job (processing results pages)
 │   └── place.go        # Place job (extracting single listing details)
-├── internal/           # Internal packages (api, service, repository)
+├── internal/           # Internal packages
+│   ├── api/            # HTTP API handlers and router
+│   ├── cache/          # Redis cache layer
+│   ├── domain/         # Domain models (Job, Worker, Result)
+│   ├── mq/             # RabbitMQ publisher/consumer
+│   ├── queue/          # Redis/Asynq job queue (fallback)
+│   ├── repository/     # PostgreSQL/SQLite data access
+│   ├── service/        # Business logic services
+│   └── worker/         # Worker runner implementation
 └── deduper/            # Deduplication logic
 ```
 
@@ -72,6 +81,8 @@ main.go                 # Entry point, config parsing, runner initialization
 - **Scraping Engine**: `scrapemate`
 - **Browser Automation**: Playwright-Go (default) or Go-Rod (build tag: `rod`)
 - **Storage**: PostgreSQL (distributed), SQLite (Web UI)
+- **Job Queue**: RabbitMQ (preferred) or Redis/Asynq (fallback)
+- **Cache**: Redis (for dashboard performance)
 - **Infrastructure**: Docker, AWS Lambda
 
 ## Operation Modes
@@ -79,24 +90,33 @@ main.go                 # Entry point, config parsing, runner initialization
 | Mode | Flag | Description |
 |------|------|-------------|
 | **Manager** | `-manager` | API server + Web UI (no scraping) - **RECOMMENDED** |
-| **Worker** | `-worker` | Scraper that connects to Manager via Redis |
+| **Worker** | `-worker` | Scraper that connects to Manager via RabbitMQ/Redis |
 | CLI (deprecated) | `-input` | Input file → Output file |
 | Distributed (deprecated) | `-dsn` | PostgreSQL-coordinated instances |
 | Serverless | `-aws-lambda` | AWS Lambda deployment |
 
-### Recommended Architecture (Manager/Worker)
+### Recommended Architecture (Manager/Worker with RabbitMQ)
 
 ```bash
 # Manager (API + Dashboard)
-./gmaps-scraper -manager -dsn 'postgres://...' -redis-addr localhost:6379 -addr :8080
+./gmaps-scraper -manager -dsn 'postgres://...' \
+  -rabbitmq-url 'amqp://guest:guest@localhost:5672/' \
+  -redis-addr localhost:6379 -addr :8080
 
 # Worker (can run multiple instances)
-./gmaps-scraper -worker -manager-url http://localhost:8080 -redis-addr localhost:6379
+./gmaps-scraper -worker -manager-url http://localhost:8080 \
+  -rabbitmq-url 'amqp://guest:guest@localhost:5672/' \
+  -redis-addr localhost:6379
 
-# Docker Compose (starts postgres, redis, manager, worker)
+# Docker Compose (starts postgres, redis, rabbitmq, manager, worker)
 docker-compose up -d
 docker-compose up -d --scale worker=4  # Scale to 4 workers
 ```
+
+**Priority order for job queue:**
+1. RabbitMQ (preferred) - durable, priority queues, better for production
+2. Redis/Asynq (fallback) - if RabbitMQ unavailable
+3. HTTP polling (last resort) - if neither queue is available
 
 ## Key Configuration Flags
 
@@ -105,7 +125,8 @@ docker-compose up -d --scale worker=4  # Scale to 4 workers
 | `-manager` | Run as Manager (API + Web UI) |
 | `-worker` | Run as Worker (connects to Manager) |
 | `-manager-url` | Manager API URL for worker mode |
-| `-redis-addr` | Redis address for job queue |
+| `-rabbitmq-url` | RabbitMQ connection URL (preferred job queue) |
+| `-redis-addr` | Redis address for cache and deduplication |
 | `-dsn` | PostgreSQL connection string |
 | `-input` | Input file with queries |
 | `-results` | Output file path |
@@ -136,4 +157,7 @@ Custom output writers can be implemented as Go plugins. See `examples/plugins` f
 
 - **Hybrid Parsing**: Tries JSON embedded in page source first, falls back to DOM parsing
 - **Smart Scrolling**: Custom logic to scroll through dynamic search sidebars
-- **Deduplication**: In-memory or database-backed to avoid redundant processing
+- **Deduplication**: Redis-backed (distributed) or in-memory to avoid redundant processing
+- **Job Queue Priority**: RabbitMQ > Redis/Asynq > HTTP polling (graceful fallback)
+- **Caching**: Redis cache layer for Dashboard API endpoints (30s-120s TTL)
+- **Database Normalization**: `results` table auto-populates `business_listings` + `emails` via trigger

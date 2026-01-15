@@ -16,6 +16,7 @@ import (
 	"github.com/xuri/excelize/v2"
 
 	"github.com/sadewadee/google-scraper/gmaps"
+	"github.com/sadewadee/google-scraper/internal/cache"
 	"github.com/sadewadee/google-scraper/internal/domain"
 	"github.com/sadewadee/google-scraper/internal/service"
 )
@@ -44,6 +45,7 @@ type ResultServiceInterface interface {
 type JobHandler struct {
 	jobs    JobServiceInterface
 	results ResultServiceInterface
+	cache   cache.Cache
 }
 
 // MaxResultBatchSize is the maximum size of a result batch (10MB)
@@ -107,6 +109,40 @@ func NewJobHandler(jobs JobServiceInterface, results ResultServiceInterface) *Jo
 	return &JobHandler{
 		jobs:    jobs,
 		results: results,
+	}
+}
+
+// NewJobHandlerWithCache creates a new JobHandler with caching support
+func NewJobHandlerWithCache(jobs JobServiceInterface, results ResultServiceInterface, c cache.Cache) *JobHandler {
+	return &JobHandler{
+		jobs:    jobs,
+		results: results,
+		cache:   c,
+	}
+}
+
+// invalidateJobCache invalidates all job-related cache entries
+func (h *JobHandler) invalidateJobCache(ctx context.Context, jobID *uuid.UUID) {
+	if h.cache == nil {
+		return
+	}
+
+	// Invalidate job list cache
+	if err := h.cache.DeleteByPattern(ctx, cache.KeyPrefixDashboardJobs+":*"); err != nil {
+		log.Printf("[JobHandler] Warning: failed to invalidate job list cache: %v", err)
+	}
+
+	// Invalidate stats cache
+	if err := h.cache.Delete(ctx, cache.KeyPrefixDashboardStats); err != nil {
+		log.Printf("[JobHandler] Warning: failed to invalidate stats cache: %v", err)
+	}
+
+	// Invalidate specific job detail cache if jobID provided
+	if jobID != nil {
+		detailKey := fmt.Sprintf("%s:detail:%s", cache.KeyPrefixDashboardJobs, jobID.String())
+		if err := h.cache.Delete(ctx, detailKey); err != nil {
+			log.Printf("[JobHandler] Warning: failed to invalidate job detail cache: %v", err)
+		}
 	}
 }
 
@@ -198,6 +234,9 @@ func (h *JobHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Invalidate cache after successful create
+	h.invalidateJobCache(r.Context(), &job.ID)
+
 	log.Printf("[JobHandler] Create completed in %v (service: %v)", time.Since(start), time.Since(serviceStart))
 	RenderJSON(w, http.StatusCreated, job)
 }
@@ -208,6 +247,8 @@ func (h *JobHandler) List(w http.ResponseWriter, r *http.Request) {
 		RenderError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
+
+	ctx := r.Context()
 
 	// Parse query parameters
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
@@ -220,24 +261,50 @@ func (h *JobHandler) List(w http.ResponseWriter, r *http.Request) {
 		perPage = 20
 	}
 
+	status := r.URL.Query().Get("status")
+
+	// Try cache if available
+	if h.cache != nil {
+		cacheKey := fmt.Sprintf("%s:list:page=%d:perPage=%d:status=%s",
+			cache.KeyPrefixDashboardJobs, page, perPage, status)
+		if cached, err := h.cache.Get(ctx, cacheKey); err == nil && cached != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("X-Cache", "HIT")
+			w.WriteHeader(http.StatusOK)
+			w.Write(cached)
+			return
+		}
+	}
+
 	params := domain.JobListParams{
 		Limit:  perPage,
 		Offset: (page - 1) * perPage,
 	}
 
 	// Parse status filter
-	if status := r.URL.Query().Get("status"); status != "" {
+	if status != "" {
 		s := domain.JobStatus(status)
 		params.Status = &s
 	}
 
-	jobs, total, err := h.jobs.List(r.Context(), params)
+	jobs, total, err := h.jobs.List(ctx, params)
 	if err != nil {
 		RenderError(w, http.StatusInternalServerError, "Failed to list jobs: "+err.Error())
 		return
 	}
 
 	response := NewPaginatedResponse(jobs, total, page, perPage)
+
+	// Cache the response if cache available
+	if h.cache != nil {
+		cacheKey := fmt.Sprintf("%s:list:page=%d:perPage=%d:status=%s",
+			cache.KeyPrefixDashboardJobs, page, perPage, status)
+		if data, err := json.Marshal(response); err == nil {
+			h.cache.Set(ctx, cacheKey, data, cache.TTLJobsList)
+		}
+	}
+
+	w.Header().Set("X-Cache", "MISS")
 	RenderJSON(w, http.StatusOK, response)
 }
 
@@ -254,7 +321,21 @@ func (h *JobHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	job, err := h.jobs.GetByID(r.Context(), id)
+	ctx := r.Context()
+
+	// Try cache if available
+	if h.cache != nil {
+		cacheKey := fmt.Sprintf("%s:%s", cache.KeyPrefixDashboardJobs, id.String())
+		if cached, err := h.cache.Get(ctx, cacheKey); err == nil && cached != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("X-Cache", "HIT")
+			w.WriteHeader(http.StatusOK)
+			w.Write(cached)
+			return
+		}
+	}
+
+	job, err := h.jobs.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, service.ErrJobNotFound) {
 			RenderError(w, http.StatusNotFound, "Job not found")
@@ -264,6 +345,15 @@ func (h *JobHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Cache the response if cache available
+	if h.cache != nil {
+		cacheKey := fmt.Sprintf("%s:%s", cache.KeyPrefixDashboardJobs, id.String())
+		if data, err := json.Marshal(job); err == nil {
+			h.cache.Set(ctx, cacheKey, data, cache.TTLJobDetail)
+		}
+	}
+
+	w.Header().Set("X-Cache", "MISS")
 	RenderJSON(w, http.StatusOK, job)
 }
 
@@ -288,6 +378,9 @@ func (h *JobHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+
+	// Invalidate cache after successful delete
+	h.invalidateJobCache(r.Context(), &id)
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -315,6 +408,9 @@ func (h *JobHandler) Pause(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Invalidate cache after successful pause
+	h.invalidateJobCache(r.Context(), &id)
+
 	RenderJSON(w, http.StatusOK, job)
 }
 
@@ -341,6 +437,9 @@ func (h *JobHandler) Resume(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Invalidate cache after successful resume
+	h.invalidateJobCache(r.Context(), &id)
+
 	RenderJSON(w, http.StatusOK, job)
 }
 
@@ -366,6 +465,9 @@ func (h *JobHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+
+	// Invalidate cache after successful cancel
+	h.invalidateJobCache(r.Context(), &id)
 
 	RenderJSON(w, http.StatusOK, job)
 }

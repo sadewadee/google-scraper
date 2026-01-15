@@ -57,6 +57,19 @@ type Review struct {
 	When           string   `json:"when"`
 }
 
+// EmailValidation holds validation result for a single email
+type EmailValidation struct {
+	Email       string  `json:"email"`
+	Status      string  `json:"status"`       // valid, invalid, unknown, catch_all
+	Score       float64 `json:"score"`        // 0-100
+	Deliverable bool    `json:"deliverable"`
+	Disposable  bool    `json:"disposable"`
+	RoleAccount bool    `json:"role_account"`
+	FreeEmail   bool    `json:"free_email"`
+	CatchAll    bool    `json:"catch_all"`
+	Reason      string  `json:"reason"`
+}
+
 type Entry struct {
 	ID         string              `json:"input_id"`
 	Link       string              `json:"link"`
@@ -95,6 +108,7 @@ type Entry struct {
 	UserReviews         []Review               `json:"user_reviews"`
 	UserReviewsExtended []Review               `json:"user_reviews_extended"`
 	Emails              []string               `json:"emails"`
+	EmailValidations    []EmailValidation      `json:"email_validations,omitempty"` // Validation metadata for emails
 }
 
 func (e *Entry) haversineDistance(lat, lon float64) float64 {

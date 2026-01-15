@@ -105,6 +105,42 @@ func (c *Client) Heartbeat(ctx context.Context, status domain.WorkerStatus, curr
 	return nil
 }
 
+// GetJob fetches a specific job by ID from the manager
+func (c *Client) GetJob(ctx context.Context, jobID uuid.UUID) (*domain.Job, error) {
+	url := fmt.Sprintf("/api/v2/jobs/%s", jobID.String())
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	if c.apiToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiToken)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get job: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil // Job not found
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.parseError(resp)
+	}
+
+	var job domain.Job
+	if err := json.NewDecoder(resp.Body).Decode(&job); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &job, nil
+}
+
 // ClaimJob claims a pending job from the manager
 func (c *Client) ClaimJob(ctx context.Context) (*domain.Job, error) {
 	url := fmt.Sprintf("/api/v2/workers/%s/claim", c.workerID)
