@@ -34,12 +34,25 @@ func NewDeduper(cfg *DedupeConfig) (*Deduper, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse redis URL: %w", err)
 		}
+		// Add connection pool settings
+		opt.PoolSize = 10
+		opt.MinIdleConns = 2
+		opt.DialTimeout = 5 * time.Second
+		opt.ReadTimeout = 3 * time.Second
+		opt.WriteTimeout = 3 * time.Second
+		opt.PoolTimeout = 4 * time.Second
 		client = redis.NewClient(opt)
 	} else if cfg.RedisAddr != "" {
 		client = redis.NewClient(&redis.Options{
-			Addr:     cfg.RedisAddr,
-			Password: cfg.Password,
-			DB:       cfg.DB,
+			Addr:         cfg.RedisAddr,
+			Password:     cfg.Password,
+			DB:           cfg.DB,
+			PoolSize:     10,
+			MinIdleConns: 2,
+			DialTimeout:  5 * time.Second,
+			ReadTimeout:  3 * time.Second,
+			WriteTimeout: 3 * time.Second,
+			PoolTimeout:  4 * time.Second,
 		})
 	} else {
 		return nil, fmt.Errorf("redis URL or address is required")

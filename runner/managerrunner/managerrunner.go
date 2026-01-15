@@ -283,12 +283,14 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 	}
 
 	// Create HTTP server
+	// WriteTimeout set to 6 minutes to accommodate large downloads
+	// (results exports can have 100k+ records)
 	srv := &http.Server{
 		Addr:              cfg.Address,
 		Handler:           httpHandler,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       60 * time.Second,
-		WriteTimeout:      60 * time.Second,
+		WriteTimeout:      6 * time.Minute,
 		IdleTimeout:       120 * time.Second,
 		MaxHeaderBytes:    1 << 20,
 	}

@@ -33,13 +33,25 @@ func NewClient(baseURL, workerID string) *Client {
 		apiToken = os.Getenv("API_KEY")
 	}
 
+	// Create transport with connection pooling and timeouts
+	transport := &http.Transport{
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     90 * time.Second,
+		DisableKeepAlives:   false,
+		// Prevent connection hangs
+		ResponseHeaderTimeout: 30 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
 	return &Client{
 		baseURL:  baseURL,
 		workerID: workerID,
 		hostname: hostname,
 		apiToken: apiToken,
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout:   60 * time.Second, // Increased from 30s for large result batches
+			Transport: transport,
 		},
 	}
 }

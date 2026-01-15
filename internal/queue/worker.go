@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/hibiken/asynq"
 )
@@ -40,9 +41,13 @@ func NewWorker(cfg *WorkerConfig, handler JobHandler) (*Worker, error) {
 		redisOpt = opt
 	} else if cfg.RedisAddr != "" {
 		redisOpt = asynq.RedisClientOpt{
-			Addr:     cfg.RedisAddr,
-			Password: cfg.Password,
-			DB:       cfg.DB,
+			Addr:         cfg.RedisAddr,
+			Password:     cfg.Password,
+			DB:           cfg.DB,
+			DialTimeout:  5 * time.Second,
+			ReadTimeout:  3 * time.Second,
+			WriteTimeout: 3 * time.Second,
+			PoolSize:     10,
 		}
 	} else {
 		return nil, fmt.Errorf("redis URL or address is required")

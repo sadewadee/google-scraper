@@ -149,6 +149,10 @@ func (r *JobRepository) Create(ctx context.Context, job *domain.Job) error {
 
 // GetByID retrieves a job by ID
 func (r *JobRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Job, error) {
+	// Add timeout to prevent hanging
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
 	query := `
 		SELECT
 			id, name, status, priority,
@@ -435,6 +439,10 @@ func (r *JobRepository) ReleaseJob(ctx context.Context, id uuid.UUID) error {
 
 // GetStats retrieves job statistics
 func (r *JobRepository) GetStats(ctx context.Context) (*domain.JobStats, error) {
+	// Add timeout to prevent hanging on stats query
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
 	query := `
 		SELECT
 			COUNT(*) as total,

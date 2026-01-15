@@ -15,6 +15,8 @@ import (
 	"github.com/sadewadee/google-scraper/gmaps"
 )
 
+// Note: downloadTimeout constant is defined in jobs.go (5 minutes)
+
 // GlobalResultServiceInterface defines methods for global results access
 type GlobalResultServiceInterface interface {
 	ListAll(ctx context.Context, limit, offset int) ([][]byte, int, error)
@@ -93,6 +95,10 @@ func (h *ResultHandler) Download(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ResultHandler) downloadJSON(w http.ResponseWriter, r *http.Request) {
+	// Create download context with timeout
+	ctx, cancel := context.WithTimeout(r.Context(), downloadTimeout)
+	defer cancel()
+
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Disposition", "attachment; filename=all-results.json")
 
@@ -104,8 +110,17 @@ func (h *ResultHandler) downloadJSON(w http.ResponseWriter, r *http.Request) {
 	batchSize := 1000
 
 	for {
-		results, _, err := h.results.ListAll(r.Context(), batchSize, offset)
+		// Check context before each batch
+		select {
+		case <-ctx.Done():
+			log.Printf("download JSON cancelled: %v", ctx.Err())
+			return
+		default:
+		}
+
+		results, _, err := h.results.ListAll(ctx, batchSize, offset)
 		if err != nil {
+			log.Printf("error fetching results for JSON download: %v", err)
 			break
 		}
 
@@ -121,6 +136,11 @@ func (h *ResultHandler) downloadJSON(w http.ResponseWriter, r *http.Request) {
 			w.Write(data)
 		}
 
+		// Flush response to prevent buffering timeout
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+
 		offset += batchSize
 	}
 
@@ -128,6 +148,10 @@ func (h *ResultHandler) downloadJSON(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ResultHandler) downloadCSV(w http.ResponseWriter, r *http.Request) {
+	// Create download context with timeout
+	ctx, cancel := context.WithTimeout(r.Context(), downloadTimeout)
+	defer cancel()
+
 	w.Header().Set("Content-Type", "text/csv")
 	w.Header().Set("Content-Disposition", "attachment; filename=all-results.csv")
 
@@ -147,8 +171,17 @@ func (h *ResultHandler) downloadCSV(w http.ResponseWriter, r *http.Request) {
 	batchSize := 1000
 
 	for {
-		results, _, err := h.results.ListAll(r.Context(), batchSize, offset)
+		// Check context before each batch
+		select {
+		case <-ctx.Done():
+			log.Printf("download CSV cancelled: %v", ctx.Err())
+			return
+		default:
+		}
+
+		results, _, err := h.results.ListAll(ctx, batchSize, offset)
 		if err != nil {
+			log.Printf("error fetching results for CSV download: %v", err)
 			break
 		}
 
@@ -172,10 +205,19 @@ func (h *ResultHandler) downloadCSV(w http.ResponseWriter, r *http.Request) {
 
 		offset += batchSize
 		writer.Flush()
+
+		// Flush HTTP response to prevent buffering timeout
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
 	}
 }
 
 func (h *ResultHandler) downloadXLSX(w http.ResponseWriter, r *http.Request) {
+	// Create download context with timeout
+	ctx, cancel := context.WithTimeout(r.Context(), downloadTimeout)
+	defer cancel()
+
 	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	w.Header().Set("Content-Disposition", "attachment; filename=all-results.xlsx")
 
@@ -207,8 +249,17 @@ func (h *ResultHandler) downloadXLSX(w http.ResponseWriter, r *http.Request) {
 	batchSize := 1000
 
 	for {
-		results, _, err := h.results.ListAll(r.Context(), batchSize, offset)
+		// Check context before each batch
+		select {
+		case <-ctx.Done():
+			log.Printf("download XLSX cancelled: %v", ctx.Err())
+			return
+		default:
+		}
+
+		results, _, err := h.results.ListAll(ctx, batchSize, offset)
 		if err != nil {
+			log.Printf("error fetching results for XLSX download: %v", err)
 			break
 		}
 

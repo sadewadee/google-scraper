@@ -49,6 +49,9 @@ type JobHandler struct {
 // MaxResultBatchSize is the maximum size of a result batch (10MB)
 const MaxResultBatchSize = 10 << 20
 
+// downloadTimeout is the timeout for large download operations (5 minutes)
+const downloadTimeout = 5 * time.Minute
+
 // SubmitResults handles POST /api/v2/jobs/{id}/results
 func (h *JobHandler) SubmitResults(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -440,31 +443,46 @@ func (h *JobHandler) DownloadResults(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *JobHandler) downloadJSON(w http.ResponseWriter, r *http.Request, jobID uuid.UUID) {
+	// Create download context with timeout
+	ctx, cancel := context.WithTimeout(r.Context(), downloadTimeout)
+	defer cancel()
+
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Disposition", "attachment; filename=results-"+jobID.String()+".json")
 
 	w.Write([]byte("["))
 	first := true
+	count := 0
 
-	err := h.results.StreamByJobID(r.Context(), jobID, func(data []byte) error {
+	err := h.results.StreamByJobID(ctx, jobID, func(data []byte) error {
 		if !first {
 			w.Write([]byte(","))
 		}
 		first = false
 		w.Write(data)
+		count++
+
+		// Flush every 100 records to prevent buffering timeout
+		if count%100 == 0 {
+			if flusher, ok := w.(http.Flusher); ok {
+				flusher.Flush()
+			}
+		}
 		return nil
 	})
 
 	if err != nil {
-		// Already started writing, can't change status
-		w.Write([]byte("]"))
-		return
+		log.Printf("error streaming JSON for job %s: %v", jobID, err)
 	}
 
 	w.Write([]byte("]"))
 }
 
 func (h *JobHandler) downloadCSV(w http.ResponseWriter, r *http.Request, jobID uuid.UUID) {
+	// Create download context with timeout
+	ctx, cancel := context.WithTimeout(r.Context(), downloadTimeout)
+	defer cancel()
+
 	w.Header().Set("Content-Type", "text/csv")
 	w.Header().Set("Content-Disposition", "attachment; filename=results-"+jobID.String()+".csv")
 
@@ -479,7 +497,8 @@ func (h *JobHandler) downloadCSV(w http.ResponseWriter, r *http.Request, jobID u
 		return
 	}
 
-	err := h.results.StreamByJobID(r.Context(), jobID, func(data []byte) error {
+	count := 0
+	err := h.results.StreamByJobID(ctx, jobID, func(data []byte) error {
 		var entry gmaps.Entry
 		if err := json.Unmarshal(data, &entry); err != nil {
 			return err
@@ -490,15 +509,31 @@ func (h *JobHandler) downloadCSV(w http.ResponseWriter, r *http.Request, jobID u
 			record[i] = availableColumns[col](&entry)
 		}
 
-		return writer.Write(record)
+		if err := writer.Write(record); err != nil {
+			return err
+		}
+
+		count++
+		// Flush every 100 records to prevent buffering timeout
+		if count%100 == 0 {
+			writer.Flush()
+			if flusher, ok := w.(http.Flusher); ok {
+				flusher.Flush()
+			}
+		}
+		return nil
 	})
 
 	if err != nil {
-		// Log error if needed
+		log.Printf("error streaming CSV for job %s: %v", jobID, err)
 	}
 }
 
 func (h *JobHandler) downloadXLSX(w http.ResponseWriter, r *http.Request, jobID uuid.UUID) {
+	// Create download context with timeout
+	ctx, cancel := context.WithTimeout(r.Context(), downloadTimeout)
+	defer cancel()
+
 	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	w.Header().Set("Content-Disposition", "attachment; filename=results-"+jobID.String()+".xlsx")
 
@@ -529,7 +564,7 @@ func (h *JobHandler) downloadXLSX(w http.ResponseWriter, r *http.Request, jobID 
 	f.SetCellStyle(sheetName, "A1", lastCol, headerStyle)
 
 	rowNum := 2
-	err := h.results.StreamByJobID(r.Context(), jobID, func(data []byte) error {
+	err := h.results.StreamByJobID(ctx, jobID, func(data []byte) error {
 		var entry gmaps.Entry
 		if err := json.Unmarshal(data, &entry); err != nil {
 			return err
@@ -544,7 +579,7 @@ func (h *JobHandler) downloadXLSX(w http.ResponseWriter, r *http.Request, jobID 
 	})
 
 	if err != nil {
-		log.Printf("error streaming results for XLSX: %v", err)
+		log.Printf("error streaming results for XLSX job %s: %v", jobID, err)
 	}
 
 	// Auto-fit column widths (approximate)
