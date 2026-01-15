@@ -188,12 +188,12 @@ func (p *provider) fetchJobs(ctx context.Context) {
 		WHERE id IN (
 			SELECT id from gmaps_jobs
 			WHERE status = $2
-			ORDER BY priority ASC, created_at ASC FOR UPDATE SKIP LOCKED 
+			ORDER BY priority ASC, created_at ASC FOR UPDATE SKIP LOCKED
 		LIMIT $3
 		)
 		RETURNING *
 	)
-	SELECT payload_type, payload from updated ORDER by priority ASC, created_at ASC
+	SELECT payload_type, payload, parent_job_id from updated ORDER by priority ASC, created_at ASC
 	`
 
 	baseDelay := time.Millisecond * 50
@@ -221,9 +221,10 @@ func (p *provider) fetchJobs(ctx context.Context) {
 			var (
 				payloadType string
 				payload     []byte
+				parentID    sql.NullString
 			)
 
-			if err := rows.Scan(&payloadType, &payload); err != nil {
+			if err := rows.Scan(&payloadType, &payload, &parentID); err != nil {
 				p.errc <- err
 
 				return
@@ -234,6 +235,19 @@ func (p *provider) fetchJobs(ctx context.Context) {
 				p.errc <- err
 
 				return
+			}
+
+			// Inject ParentID from database column if present
+			// This ensures the worker knows which Dashboard job this belongs to
+			if parentID.Valid && parentID.String != "" {
+				switch j := job.(type) {
+				case *gmaps.GmapJob:
+					j.ParentID = parentID.String
+				case *gmaps.PlaceJob:
+					j.ParentID = parentID.String
+				case *gmaps.EmailExtractJob:
+					j.ParentID = parentID.String
+				}
 			}
 
 			jobs = append(jobs, job)
