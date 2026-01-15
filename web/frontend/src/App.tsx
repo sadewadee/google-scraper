@@ -1,7 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
+import { ThemeProvider, CssBaseline } from "@mui/material"
 import { Toaster } from "sonner"
-import { AppShell } from "./components/Layout/AppShell"
+import { theme } from "./theme"
+import { Layout } from "./components/Layout"
 import { isAuthenticated } from "./api/client"
 import Dashboard from "./pages/Dashboard"
 import Jobs from "./pages/Jobs"
@@ -32,37 +34,40 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <Toaster position="top-right" richColors closeButton />
-      <BrowserRouter>
-        <Routes>
-          {/* Public route */}
-          <Route path="/login" element={<Login />} />
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <QueryClientProvider client={queryClient}>
+        <Toaster position="top-right" richColors closeButton />
+        <BrowserRouter>
+          <Routes>
+            {/* Public route */}
+            <Route path="/login" element={<Login />} />
 
-          {/* Protected routes */}
-          <Route
-            path="/*"
-            element={
-              <ProtectedRoute>
-                <AppShell>
-                  <Routes>
-                    <Route path="/" element={<Dashboard />} />
-                    <Route path="/jobs" element={<Jobs />} />
-                    <Route path="/jobs/new" element={<JobCreate />} />
-                    <Route path="/jobs/:id" element={<JobDetail />} />
-                    <Route path="/results" element={<Results />} />
-                    <Route path="/workers" element={<Workers />} />
-                    <Route path="/proxies" element={<ProxyGate />} />
-                    <Route path="/settings" element={<Settings />} />
-                    <Route path="*" element={<Navigate to="/" replace />} />
-                  </Routes>
-                </AppShell>
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </BrowserRouter>
-    </QueryClientProvider>
+            {/* Protected routes */}
+            <Route
+              path="/*"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Routes>
+                      <Route path="/" element={<Dashboard />} />
+                      <Route path="/jobs" element={<Jobs />} />
+                      <Route path="/jobs/new" element={<JobCreate />} />
+                      <Route path="/jobs/:id" element={<JobDetail />} />
+                      <Route path="/results" element={<Results />} />
+                      <Route path="/workers" element={<Workers />} />
+                      <Route path="/proxies" element={<ProxyGate />} />
+                      <Route path="/settings" element={<Settings />} />
+                      <Route path="*" element={<Navigate to="/" replace />} />
+                    </Routes>
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </ThemeProvider>
   )
 }
 
