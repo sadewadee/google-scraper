@@ -65,7 +65,8 @@ gmaps.db
 results/
 !web/frontend/src/components/Results/
 webdata/
-cache/
+/cache/
+!internal/cache/
 
 # Migrations folder (but keep .sql files)
 runner/managerrunner/gmaps.db
