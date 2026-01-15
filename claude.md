@@ -45,14 +45,14 @@ main.go                 # Entry point, config parsing, runner initialization
 ├── runner/             # Core execution logic
 │   ├── runner.go       # Config struct and CLI flags
 │   ├── filerunner/     # CLI mode (input file → output file)
-│   ├── webrunner/      # Web UI server and job management
+│   ├── managerrunner/  # Web UI server and job management (Manager)
 │   ├── databaserunner/ # Distributed scraping with PostgreSQL
 │   └── lambdaaws/      # AWS Lambda execution
 ├── gmaps/              # Google Maps domain logic
 │   ├── entry.go        # Entry struct (business data model)
 │   ├── job.go          # Search job (processing results pages)
 │   └── place.go        # Place job (extracting single listing details)
-├── web/                # Web server (handlers, API)
+├── internal/           # Internal packages (api, service, repository)
 └── deduper/            # Deduplication logic
 ```
 
@@ -81,7 +81,6 @@ main.go                 # Entry point, config parsing, runner initialization
 | **Manager** | `-manager` | API server + Web UI (no scraping) - **RECOMMENDED** |
 | **Worker** | `-worker` | Scraper that connects to Manager via Redis |
 | CLI (deprecated) | `-input` | Input file → Output file |
-| Web UI (deprecated) | `-web` | Local dashboard with SQLite |
 | Distributed (deprecated) | `-dsn` | PostgreSQL-coordinated instances |
 | Serverless | `-aws-lambda` | AWS Lambda deployment |
 
