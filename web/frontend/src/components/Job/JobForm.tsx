@@ -3,12 +3,26 @@ import { useNavigate } from "react-router-dom"
 import { useForm } from "react-hook-form"
 import { AxiosError } from "axios"
 import { toast } from "sonner"
-import { Button } from "@/components/UI/Button"
-import { Input } from "@/components/UI/Input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/UI/Card"
 import { jobsApi } from "@/api/jobs"
 import type { JobCreatePayload, Job } from "@/api/types"
 import { AlertCircle, CheckCircle2 } from "lucide-react"
+import {
+    TextField,
+    Button,
+    Select,
+    MenuItem,
+    FormControl,
+    InputLabel,
+    Checkbox,
+    FormControlLabel,
+    Box,
+    Card as MuiCard,
+    CardContent as MuiCardContent,
+    CardHeader as MuiCardHeader,
+    Alert,
+    Stack,
+    Grid
+} from "@mui/material"
 
 interface FormData {
     name: string
@@ -38,7 +52,7 @@ export function JobForm({ cloneFrom, isRetry }: JobFormProps) {
     const {
         register,
         handleSubmit,
-        formState: { isSubmitting },
+        formState: { isSubmitting, errors },
         reset,
         watch,
         setValue,
@@ -83,7 +97,7 @@ export function JobForm({ cloneFrom, isRetry }: JobFormProps) {
     const lon = watch("lon")
 
     // Check if form is ready for submission (especially for Fast Mode)
-    const isReady = !isFastMode || (isFastMode && lat && lon)
+    const isReady = !isFastMode || (isFastMode && !!lat && !!lon)
 
     async function onSubmit(data: FormData) {
         setError(null)
@@ -165,190 +179,195 @@ export function JobForm({ cloneFrom, isRetry }: JobFormProps) {
     }
 
     return (
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Job Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium">Job Name *</label>
-                        <Input
-                            placeholder="e.g. Coffee Shops Jakarta"
-                            {...register("name")}
-                        />
-                    </div>
+        <form onSubmit={handleSubmit(onSubmit)}>
+            <Stack spacing={3}>
+                <MuiCard>
+                    <MuiCardHeader title="Job Details" />
+                    <MuiCardContent>
+                        <Stack spacing={3}>
+                            <TextField
+                                label="Job Name"
+                                placeholder="e.g. Coffee Shops Jakarta"
+                                required
+                                fullWidth
+                                {...register("name")}
+                                error={!!errors.name}
+                                helperText={errors.name?.message}
+                            />
 
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium">Keywords *</label>
-                        <textarea
-                            placeholder="Enter keywords (one per line or comma-separated)&#10;e.g. coffee shop jakarta&#10;restaurant bandung"
-                            {...register("keywords")}
-                            rows={4}
-                            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                        />
-                        <p className="text-xs text-muted-foreground">
-                            Enter search queries for Google Maps. Each keyword will be scraped separately.
-                        </p>
-                    </div>
+                            <TextField
+                                label="Keywords"
+                                placeholder="Enter keywords (one per line or comma-separated)&#10;e.g. coffee shop jakarta&#10;restaurant bandung"
+                                multiline
+                                rows={4}
+                                required
+                                fullWidth
+                                {...register("keywords")}
+                                helperText="Enter search queries for Google Maps. Each keyword will be scraped separately."
+                            />
 
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Language</label>
-                            <select
-                                {...register("lang")}
-                                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                            >
-                                <option value="en">English</option>
-                                <option value="id">Indonesian</option>
-                                <option value="de">German</option>
-                                <option value="fr">French</option>
-                                <option value="es">Spanish</option>
-                                <option value="ja">Japanese</option>
-                                <option value="ko">Korean</option>
-                                <option value="zh">Chinese</option>
-                            </select>
-                        </div>
+                            <Grid container spacing={2}>
+                                <Grid size={{ xs: 12, md: 6 }}>
+                                    <FormControl fullWidth>
+                                        <InputLabel>Language</InputLabel>
+                                        <Select
+                                            {...register("lang")}
+                                            defaultValue="en"
+                                            label="Language"
+                                        >
+                                            <MenuItem value="en">English</MenuItem>
+                                            <MenuItem value="id">Indonesian</MenuItem>
+                                            <MenuItem value="de">German</MenuItem>
+                                            <MenuItem value="fr">French</MenuItem>
+                                            <MenuItem value="es">Spanish</MenuItem>
+                                            <MenuItem value="ja">Japanese</MenuItem>
+                                            <MenuItem value="ko">Korean</MenuItem>
+                                            <MenuItem value="zh">Chinese</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Priority (0-10)</label>
-                            <Input
+                                <Grid size={{ xs: 12, md: 6 }}>
+                                    <TextField
+                                        label="Priority (0-10)"
+                                        type="number"
+                                        slotProps={{ htmlInput: { min: 0, max: 10 } }}
+                                        fullWidth
+                                        {...register("priority", { valueAsNumber: true })}
+                                        helperText="Higher = processed first"
+                                    />
+                                </Grid>
+                            </Grid>
+
+                            <TextField
+                                label="Max Time (seconds)"
                                 type="number"
-                                min={0}
-                                max={10}
-                                {...register("priority", { valueAsNumber: true })}
+                                slotProps={{ htmlInput: { min: 180 } }}
+                                fullWidth
+                                {...register("max_time", { valueAsNumber: true })}
+                                helperText="Minimum 180 seconds (3 minutes)"
                             />
-                            <p className="text-xs text-muted-foreground">Higher = processed first</p>
-                        </div>
-                    </div>
+                        </Stack>
+                    </MuiCardContent>
+                </MuiCard>
 
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium">Max Time (seconds)</label>
-                        <Input
-                            type="number"
-                            min={180}
-                            {...register("max_time", { valueAsNumber: true })}
-                        />
-                        <p className="text-xs text-muted-foreground">Minimum 180 seconds (3 minutes)</p>
-                    </div>
-                </CardContent>
-            </Card>
+                <MuiCard>
+                    <MuiCardHeader title="Search Settings" />
+                    <MuiCardContent>
+                        <Stack spacing={3}>
+                            <Grid container spacing={2}>
+                                <Grid size={{ xs: 12, md: 4 }}>
+                                    <TextField
+                                        label="Depth (Max Results)"
+                                        type="number"
+                                        slotProps={{ htmlInput: { min: 1, max: 100 } }}
+                                        fullWidth
+                                        {...register("depth", { valueAsNumber: true })}
+                                    />
+                                </Grid>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Search Settings</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="grid gap-4 md:grid-cols-3">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Depth (Max Results)</label>
-                            <Input
-                                type="number"
-                                min={1}
-                                max={100}
-                                {...register("depth", { valueAsNumber: true })}
-                            />
-                        </div>
+                                <Grid size={{ xs: 12, md: 4 }}>
+                                    <TextField
+                                        label="Zoom Level"
+                                        type="number"
+                                        slotProps={{ htmlInput: { min: 1, max: 21 } }}
+                                        fullWidth
+                                        {...register("zoom", { valueAsNumber: true })}
+                                    />
+                                </Grid>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Zoom Level</label>
-                            <Input
-                                type="number"
-                                min={1}
-                                max={21}
-                                {...register("zoom", { valueAsNumber: true })}
-                            />
-                        </div>
+                                <Grid size={{ xs: 12, md: 4 }}>
+                                    <TextField
+                                        label="Radius (meters)"
+                                        type="number"
+                                        slotProps={{ htmlInput: { min: 100, max: 50000 } }}
+                                        fullWidth
+                                        {...register("radius", { valueAsNumber: true })}
+                                    />
+                                </Grid>
+                            </Grid>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Radius (meters)</label>
-                            <Input
-                                type="number"
-                                min={100}
-                                max={50000}
-                                {...register("radius", { valueAsNumber: true })}
-                            />
-                        </div>
-                    </div>
+                            <Grid container spacing={2}>
+                                <Grid size={{ xs: 12, md: 6 }}>
+                                    <TextField
+                                        label="Latitude"
+                                        placeholder="e.g. -6.2088"
+                                        fullWidth
+                                        required={isFastMode}
+                                        error={isFastMode && (!lat || lat.length === 0)}
+                                        helperText={isFastMode && (!lat || lat.length === 0) ? "Required for Fast Mode" : ""}
+                                        {...register("lat")}
+                                    />
+                                </Grid>
 
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Latitude {isFastMode && <span className="text-destructive">*</span>}</label>
-                            <Input
-                                placeholder="e.g. -6.2088"
-                                {...register("lat")}
-                                className={isFastMode && (!lat || lat.length === 0) ? "border-destructive" : ""}
-                            />
-                            {isFastMode && !lat && <p className="text-xs text-destructive">Required for Fast Mode</p>}
-                        </div>
+                                <Grid size={{ xs: 12, md: 6 }}>
+                                    <TextField
+                                        label="Longitude"
+                                        placeholder="e.g. 106.8456"
+                                        fullWidth
+                                        required={isFastMode}
+                                        error={isFastMode && (!lon || lon.length === 0)}
+                                        helperText={isFastMode && (!lon || lon.length === 0) ? "Required for Fast Mode" : ""}
+                                        {...register("lon")}
+                                    />
+                                </Grid>
+                            </Grid>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Longitude {isFastMode && <span className="text-destructive">*</span>}</label>
-                            <Input
-                                placeholder="e.g. 106.8456"
-                                {...register("lon")}
-                                className={isFastMode && (!lon || lon.length === 0) ? "border-destructive" : ""}
-                            />
-                            {isFastMode && !lon && <p className="text-xs text-destructive">Required for Fast Mode</p>}
-                        </div>
-                    </div>
+                            <Stack spacing={2}>
+                                <Box sx={{ display: 'flex', gap: 3 }}>
+                                    <FormControlLabel
+                                        control={<Checkbox {...register("fast_mode")} />}
+                                        label="Fast Mode"
+                                    />
+                                    <FormControlLabel
+                                        control={<Checkbox {...register("extract_email")} />}
+                                        label="Extract Emails"
+                                    />
+                                </Box>
 
-                    <div className="flex flex-col gap-4">
-                        <div className="flex gap-6">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    {...register("fast_mode")}
-                                    className="h-4 w-4 rounded border-gray-300"
-                                />
-                                <span className="text-sm font-medium">Fast Mode</span>
-                            </label>
+                                {isFastMode && (
+                                    <Alert severity="info">
+                                        <strong>Fast Mode enabled:</strong> Latitude and Longitude are required. The scraper will simulate a search from that specific location.
+                                    </Alert>
+                                )}
+                                {isExtractEmail && (
+                                    <Alert severity="info">
+                                        <strong>Email Extraction enabled:</strong> This process takes longer. Ensure Max Time is sufficient.
+                                    </Alert>
+                                )}
+                            </Stack>
+                        </Stack>
+                    </MuiCardContent>
+                </MuiCard>
 
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    {...register("extract_email")}
-                                    className="h-4 w-4 rounded border-gray-300"
-                                />
-                                <span className="text-sm font-medium">Extract Emails</span>
-                            </label>
-                        </div>
-                        {isFastMode && (
-                            <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-md">
-                                <p><strong>Fast Mode enabled:</strong> Latitude and Longitude are required. The scraper will simulate a search from that specific location.</p>
-                            </div>
-                        )}
-                        {isExtractEmail && (
-                            <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-md">
-                                <p><strong>Email Extraction enabled:</strong> This process takes longer. Ensure Max Time is sufficient.</p>
-                            </div>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
+                {error && (
+                    <Alert severity="error" icon={<AlertCircle className="h-4 w-4" />}>
+                        {error}
+                    </Alert>
+                )}
 
-            {error && (
-                <div className="flex items-center gap-2 p-3 rounded-md bg-destructive/10 text-destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    {error}
-                </div>
-            )}
+                {success && (
+                    <Alert severity="success" icon={<CheckCircle2 className="h-4 w-4" />}>
+                        Job created successfully! Redirecting...
+                    </Alert>
+                )}
 
-            {success && (
-                <div className="flex items-center gap-2 p-3 rounded-md bg-green-500/10 text-green-600">
-                    <CheckCircle2 className="h-4 w-4" />
-                    Job created successfully! Redirecting...
-                </div>
-            )}
-
-            <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => navigate("/jobs")}>
-                    Cancel
-                </Button>
-                <Button type="submit" disabled={isSubmitting || !isReady}>
-                    {isSubmitting ? "Creating..." : "Create Job"}
-                </Button>
-            </div>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                    <Button
+                        variant="outlined"
+                        onClick={() => navigate("/jobs")}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="submit"
+                        variant="contained"
+                        disabled={isSubmitting || !isReady}
+                    >
+                        {isSubmitting ? "Creating..." : "Create Job"}
+                    </Button>
+                </Box>
+            </Stack>
         </form>
     )
 }

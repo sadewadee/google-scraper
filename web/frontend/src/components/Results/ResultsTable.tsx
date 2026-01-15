@@ -7,28 +7,32 @@ import {
     TableBody,
     TableCell,
     TableHead,
-    TableHeader,
     TableRow,
-} from "@/components/UI/Table"
-import { Button } from "@/components/UI/Button"
-import { Input } from "@/components/UI/Input"
-import { Badge } from "@/components/UI/Badge"
-import { Drawer } from "@/components/UI/Drawer"
+    TableContainer,
+    Paper,
+    Button,
+    TextField,
+    Chip as Badge,
+    Drawer,
+    Box,
+    InputAdornment,
+    IconButton
+} from "@mui/material"
 import { BusinessDetail } from "./BusinessDetail"
 import {
     Search,
     Download,
     ChevronLeft,
     ChevronRight,
-    Settings2,
+    Settings,
     Star,
-    ExternalLink,
+    OpenInNew as ExternalLink,
     Mail,
     Phone,
-    MapPin,
-    X,
-    Check,
-} from "lucide-react"
+    Place as MapPin,
+    Close as X,
+    Check
+} from "@mui/icons-material"
 
 // Column definitions for results table
 interface ColumnDef {
@@ -46,7 +50,20 @@ const AVAILABLE_COLUMNS: ColumnDef[] = [
         render: (e, onSelect) => (
             <button
                 type="button"
-                className="font-medium max-w-[200px] truncate hover:text-primary hover:underline text-left transition-colors cursor-pointer focus:outline-none focus:text-primary"
+                style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    font: 'inherit',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    fontWeight: 500,
+                    maxWidth: 200,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                }}
+                className="hover:text-primary hover:underline"
                 title={`View details for ${e.title}`}
                 onClick={(event) => {
                     event.stopPropagation();
@@ -63,9 +80,7 @@ const AVAILABLE_COLUMNS: ColumnDef[] = [
         label: "Category",
         defaultVisible: true,
         render: (e) => (
-            <Badge variant="outline" className="text-xs">
-                {e.category || "-"}
-            </Badge>
+            <Badge variant="outlined" size="small" label={e.category || "-"} sx={{ fontSize: '0.75rem' }} />
         ),
     },
     {
@@ -73,9 +88,9 @@ const AVAILABLE_COLUMNS: ColumnDef[] = [
         label: "Address",
         defaultVisible: true,
         render: (e) => (
-            <div className="max-w-[200px] truncate text-sm text-muted-foreground" title={e.address}>
-                <MapPin className="inline h-3 w-3 mr-1" />
-                {e.address || "-"}
+            <div style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.address}>
+                <MapPin sx={{ fontSize: 12, mr: 0.5, verticalAlign: 'middle', color: 'text.secondary' }} />
+                <span style={{ fontSize: '0.875rem', color: 'text.secondary' }}>{e.address || "-"}</span>
             </div>
         ),
     },
@@ -84,14 +99,14 @@ const AVAILABLE_COLUMNS: ColumnDef[] = [
         label: "Phone",
         defaultVisible: true,
         render: (e) => (
-            <div className="text-sm">
+            <div style={{ fontSize: '0.875rem' }}>
                 {e.phone ? (
-                    <a href={`tel:${e.phone}`} className="hover:text-primary flex items-center gap-1">
-                        <Phone className="h-3 w-3" />
+                    <a href={`tel:${e.phone}`} style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'inherit', textDecoration: 'none' }} className="hover:text-primary">
+                        <Phone sx={{ fontSize: 12 }} />
                         {e.phone}
                     </a>
                 ) : (
-                    <span className="text-muted-foreground">-</span>
+                    <span style={{ color: 'text.secondary' }}>-</span>
                 )}
             </div>
         ),
@@ -101,19 +116,20 @@ const AVAILABLE_COLUMNS: ColumnDef[] = [
         label: "Website",
         defaultVisible: true,
         render: (e) => (
-            <div className="text-sm max-w-[150px] truncate">
+            <div style={{ fontSize: '0.875rem', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {e.web_site ? (
                     <a
                         href={e.web_site}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="hover:text-primary flex items-center gap-1"
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'inherit', textDecoration: 'none' }}
+                        className="hover:text-primary"
                     >
-                        <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                        <span className="truncate">{new URL(e.web_site).hostname}</span>
+                        <ExternalLink sx={{ fontSize: 12, flexShrink: 0 }} />
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{new URL(e.web_site).hostname}</span>
                     </a>
                 ) : (
-                    <span className="text-muted-foreground">-</span>
+                    <span style={{ color: 'text.secondary' }}>-</span>
                 )}
             </div>
         ),
@@ -123,19 +139,17 @@ const AVAILABLE_COLUMNS: ColumnDef[] = [
         label: "Email",
         defaultVisible: true,
         render: (e) => (
-            <div className="text-sm">
+            <div style={{ fontSize: '0.875rem' }}>
                 {e.emails && e.emails.length > 0 ? (
-                    <a href={`mailto:${e.emails[0]}`} className="hover:text-primary flex items-center gap-1">
-                        <Mail className="h-3 w-3" />
+                    <a href={`mailto:${e.emails[0]}`} style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'inherit', textDecoration: 'none' }} className="hover:text-primary">
+                        <Mail sx={{ fontSize: 12 }} />
                         {e.emails[0]}
                         {e.emails.length > 1 && (
-                            <Badge variant="outline" className="ml-1 text-xs">
-                                +{e.emails.length - 1}
-                            </Badge>
+                            <Badge variant="outlined" size="small" label={`+${e.emails.length - 1}`} sx={{ ml: 0.5, fontSize: '0.65rem', height: 16 }} />
                         )}
                     </a>
                 ) : (
-                    <span className="text-muted-foreground">-</span>
+                    <span style={{ color: 'text.secondary' }}>-</span>
                 )}
             </div>
         ),
@@ -145,10 +159,10 @@ const AVAILABLE_COLUMNS: ColumnDef[] = [
         label: "Rating",
         defaultVisible: true,
         render: (e) => (
-            <div className="flex items-center gap-1 text-sm">
-                <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.875rem' }}>
+                <Star sx={{ fontSize: 12, color: '#EAB308' }} />
                 <span>{e.review_rating?.toFixed(1) || "-"}</span>
-                <span className="text-muted-foreground">({e.review_count || 0})</span>
+                <span style={{ color: 'text.secondary' }}>({e.review_count || 0})</span>
             </div>
         ),
     },
@@ -156,26 +170,26 @@ const AVAILABLE_COLUMNS: ColumnDef[] = [
         key: "status",
         label: "Status",
         defaultVisible: false,
-        render: (e) => <span className="text-sm">{e.status || "-"}</span>,
+        render: (e) => <span style={{ fontSize: '0.875rem' }}>{e.status || "-"}</span>,
     },
     {
         key: "latitude",
         label: "Latitude",
         defaultVisible: false,
-        render: (e) => <span className="text-sm font-mono">{e.latitude?.toFixed(6) || "-"}</span>,
+        render: (e) => <span style={{ fontSize: '0.875rem', fontFamily: 'monospace' }}>{e.latitude?.toFixed(6) || "-"}</span>,
     },
     {
         key: "longitude",
         label: "Longitude",
         defaultVisible: false,
-        render: (e) => <span className="text-sm font-mono">{e.longitude?.toFixed(6) || "-"}</span>,
+        render: (e) => <span style={{ fontSize: '0.875rem', fontFamily: 'monospace' }}>{e.longitude?.toFixed(6) || "-"}</span>,
     },
     {
         key: "place_id",
         label: "Place ID",
         defaultVisible: false,
         render: (e) => (
-            <div className="max-w-[100px] truncate text-xs font-mono" title={e.place_id}>
+            <div style={{ maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.75rem', fontFamily: 'monospace' }} title={e.place_id}>
                 {e.place_id || "-"}
             </div>
         ),
@@ -184,7 +198,7 @@ const AVAILABLE_COLUMNS: ColumnDef[] = [
         key: "price_range",
         label: "Price Range",
         defaultVisible: false,
-        render: (e) => <span className="text-sm">{e.price_range || "-"}</span>,
+        render: (e) => <span style={{ fontSize: '0.875rem' }}>{e.price_range || "-"}</span>,
     },
     {
         key: "link",
@@ -196,11 +210,12 @@ const AVAILABLE_COLUMNS: ColumnDef[] = [
                     href={e.link}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm hover:text-primary"
+                    style={{ fontSize: '0.875rem', color: 'inherit' }}
+                    className="hover:text-primary"
                 >
-                    <ExternalLink className="h-4 w-4" />
+                    <ExternalLink sx={{ fontSize: 16 }} />
                 </a>
-            ) : <span className="text-muted-foreground">-</span>
+            ) : <span style={{ color: 'text.secondary' }}>-</span>
         ),
     },
 ]
@@ -272,49 +287,92 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
     return (
         <div className="space-y-4">
             {/* Toolbar */}
-            <div className="flex flex-col sm:flex-row gap-3 justify-between">
-                <div className="flex gap-2 flex-1">
+            <div className="flex flex-col sm:flex-row gap-3 justify-between" style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+                <div className="flex gap-2 flex-1" style={{ display: 'flex', gap: 8, flex: 1 }}>
                     {/* Search */}
-                    <div className="relative flex-1 max-w-sm">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
+                    <div className="relative flex-1 max-w-sm" style={{ flex: 1, maxWidth: 400 }}>
+                        <TextField
                             placeholder="Search results..."
                             value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="pl-9"
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
+                            size="small"
+                            fullWidth
+                            slotProps={{
+                                input: {
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <Search sx={{ fontSize: 16, color: 'text.secondary' }} />
+                                        </InputAdornment>
+                                    ),
+                                    endAdornment: search && (
+                                        <InputAdornment position="end">
+                                            <IconButton size="small" onClick={() => setSearch("")}>
+                                                <X sx={{ fontSize: 16 }} />
+                                            </IconButton>
+                                        </InputAdornment>
+                                    )
+                                }
+                            }}
                         />
-                        {search && (
-                            <button
-                                onClick={() => setSearch("")}
-                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                            >
-                                <X className="h-4 w-4" />
-                            </button>
-                        )}
                     </div>
 
                     {/* Column Picker */}
-                    <div className="relative">
+                    <div className="relative" style={{ position: 'relative' }}>
                         <Button
-                            variant="outline"
-                            size="icon"
+                            variant="outlined"
+                            style={{ minWidth: 40, padding: 8 }}
                             onClick={() => setShowColumnPicker(!showColumnPicker)}
                         >
-                            <Settings2 className="h-4 w-4" />
+                            <Settings sx={{ fontSize: 16 }} />
                         </Button>
 
                         {showColumnPicker && (
-                            <div className="absolute top-full right-0 mt-2 z-50 bg-neu-base border border-white/10 rounded-lg shadow-lg p-3 min-w-[200px]">
-                                <div className="text-sm font-medium mb-2">Visible Columns</div>
-                                <div className="space-y-1 max-h-[300px] overflow-y-auto">
+                            <div style={{
+                                position: 'absolute',
+                                top: '100%',
+                                right: 0,
+                                marginTop: 8,
+                                zIndex: 50,
+                                background: '#fff',
+                                border: '1px solid rgba(0,0,0,0.12)',
+                                borderRadius: 8,
+                                boxShadow: '0px 5px 5px -3px rgba(0,0,0,0.2), 0px 8px 10px 1px rgba(0,0,0,0.14), 0px 3px 14px 2px rgba(0,0,0,0.12)',
+                                padding: 12,
+                                minWidth: 200
+                            }}>
+                                <div style={{ fontSize: '0.875rem', fontWeight: 500, marginBottom: 8 }}>Visible Columns</div>
+                                <div style={{ maxHeight: 300, overflowY: 'auto' }}>
                                     {AVAILABLE_COLUMNS.map((col) => (
                                         <button
                                             key={col.key}
                                             onClick={() => toggleColumn(col.key)}
-                                            className="flex items-center gap-2 w-full px-2 py-1.5 rounded hover:bg-white/5 text-sm text-left"
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 8,
+                                                width: '100%',
+                                                padding: '6px 8px',
+                                                borderRadius: 4,
+                                                border: 'none',
+                                                background: 'transparent',
+                                                cursor: 'pointer',
+                                                textAlign: 'left',
+                                                fontSize: '0.875rem'
+                                            }}
+                                            className="hover:bg-gray-100"
                                         >
-                                            <div className={`w-4 h-4 rounded border flex items-center justify-center ${visibleColumns.includes(col.key) ? 'bg-primary border-primary' : 'border-muted-foreground'}`}>
-                                                {visibleColumns.includes(col.key) && <Check className="h-3 w-3 text-primary-foreground" />}
+                                            <div style={{
+                                                width: 16,
+                                                height: 16,
+                                                borderRadius: 4,
+                                                border: '1px solid #ccc',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                background: visibleColumns.includes(col.key) ? '#000' : 'transparent',
+                                                borderColor: visibleColumns.includes(col.key) ? '#000' : '#ccc'
+                                            }}>
+                                                {visibleColumns.includes(col.key) && <Check sx={{ fontSize: 12, color: '#fff' }} />}
                                             </div>
                                             {col.label}
                                         </button>
@@ -326,24 +384,24 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
                 </div>
 
                 {/* Export Buttons */}
-                <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => handleExport('csv')}>
-                        <Download className="mr-2 h-4 w-4" />
+                <div className="flex gap-2" style={{ display: 'flex', gap: 8 }}>
+                    <Button variant="outlined" size="small" onClick={() => handleExport('csv')}>
+                        <Download sx={{ mr: 1, fontSize: 16 }} />
                         CSV
                     </Button>
-                    <Button variant="outline" onClick={() => handleExport('xlsx')}>
-                        <Download className="mr-2 h-4 w-4" />
+                    <Button variant="outlined" size="small" onClick={() => handleExport('xlsx')}>
+                        <Download sx={{ mr: 1, fontSize: 16 }} />
                         XLSX
                     </Button>
-                    <Button variant="outline" onClick={() => handleExport('json')}>
-                        <Download className="mr-2 h-4 w-4" />
+                    <Button variant="outlined" size="small" onClick={() => handleExport('json')}>
+                        <Download sx={{ mr: 1, fontSize: 16 }} />
                         JSON
                     </Button>
                 </div>
             </div>
 
             {/* Results count */}
-            <div className="text-sm text-muted-foreground">
+            <div style={{ fontSize: '0.875rem', color: 'text.secondary', marginBottom: 16 }}>
                 {search ? (
                     <>Showing {filteredResults.length} of {total} results matching "{search}"</>
                 ) : (
@@ -352,20 +410,20 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
             </div>
 
             {/* Table */}
-            <div className="rounded-md border border-white/10">
+            <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
                 <Table>
-                    <TableHeader>
+                    <TableHead>
                         <TableRow>
                             {AVAILABLE_COLUMNS.filter((c) => visibleColumns.includes(c.key)).map((col) => (
-                                <TableHead key={col.key}>{col.label}</TableHead>
+                                <TableCell key={col.key} sx={{ fontWeight: 600 }}>{col.label}</TableCell>
                             ))}
                         </TableRow>
-                    </TableHeader>
+                    </TableHead>
                     <TableBody>
                         {isLoading ? (
                             <TableRow>
-                                <TableCell colSpan={visibleColumns.length} className="text-center py-8">
-                                    <div className="flex items-center justify-center gap-2">
+                                <TableCell colSpan={visibleColumns.length} sx={{ textAlign: 'center', py: 8 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyItems: 'center', gap: 8 }}>
                                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                                         Loading results...
                                     </div>
@@ -373,13 +431,13 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
                             </TableRow>
                         ) : filteredResults.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={visibleColumns.length} className="text-center py-8 text-muted-foreground">
+                                <TableCell colSpan={visibleColumns.length} sx={{ textAlign: 'center', py: 8, color: 'text.secondary' }}>
                                     {search ? "No results match your search." : "No results yet."}
                                 </TableCell>
                             </TableRow>
                         ) : (
                             filteredResults.map((entry, idx) => (
-                                <TableRow key={entry.place_id || entry.cid || idx}>
+                                <TableRow key={entry.place_id || entry.cid || idx} hover>
                                     {AVAILABLE_COLUMNS.filter((c) => visibleColumns.includes(c.key)).map((col) => (
                                         <TableCell key={col.key}>
                                             {col.render ? col.render(entry, setSelectedBusiness) : String((entry as unknown as Record<string, unknown>)[col.key] || "-")}
@@ -390,32 +448,32 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
                         )}
                     </TableBody>
                 </Table>
-            </div>
+            </TableContainer>
 
             {/* Pagination */}
             {totalPages > 1 && !search && (
-                <div className="flex items-center justify-between">
-                    <div className="text-sm text-muted-foreground">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 }}>
+                    <div style={{ fontSize: '0.875rem', color: 'text.secondary' }}>
                         Page {page} of {totalPages}
                     </div>
-                    <div className="flex gap-2">
+                    <div style={{ display: 'flex', gap: 8 }}>
                         <Button
-                            variant="outline"
-                            size="sm"
+                            variant="outlined"
+                            size="small"
                             onClick={() => setPage((p) => Math.max(1, p - 1))}
                             disabled={page === 1}
                         >
-                            <ChevronLeft className="h-4 w-4 mr-1" />
+                            <ChevronLeft sx={{ fontSize: 16, mr: 0.5 }} />
                             Previous
                         </Button>
                         <Button
-                            variant="outline"
-                            size="sm"
+                            variant="outlined"
+                            size="small"
                             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                             disabled={page === totalPages}
                         >
                             Next
-                            <ChevronRight className="h-4 w-4 ml-1" />
+                            <ChevronRight sx={{ fontSize: 16, ml: 0.5 }} />
                         </Button>
                     </div>
                 </div>
@@ -423,11 +481,26 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
 
             {/* Detail Drawer */}
             <Drawer
-                isOpen={!!selectedBusiness}
+                anchor="right"
+                open={!!selectedBusiness}
                 onClose={() => setSelectedBusiness(null)}
-                title={selectedBusiness?.title || "Business Details"}
+                PaperProps={{
+                    sx: { width: { xs: '100%', sm: 600 }, p: 0 }
+                }}
             >
-                {selectedBusiness && <BusinessDetail data={selectedBusiness} />}
+                {selectedBusiness && (
+                    <>
+                        <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ fontWeight: 600, fontSize: '1.125rem' }}>Business Details</div>
+                            <IconButton onClick={() => setSelectedBusiness(null)} size="small">
+                                <X />
+                            </IconButton>
+                        </Box>
+                        <Box sx={{ p: 3, overflowY: 'auto' }}>
+                            <BusinessDetail data={selectedBusiness} />
+                        </Box>
+                    </>
+                )}
             </Drawer>
         </div>
     )
