@@ -26,7 +26,6 @@ const (
 	RunModeDatabase
 	RunModeDatabaseProduce
 	RunModeInstallPlaywright
-	RunModeWeb
 	RunModeAwsLambda
 	RunModeAwsLambdaInvoker
 	RunModeManager
@@ -64,7 +63,6 @@ type Config struct {
 	Zoom                     int
 	RunMode                  int
 	DisableTelemetry         bool
-	WebRunner                bool
 	AwsLamdbaRunner          bool
 	DataFolder               string
 	Proxies                  []string
@@ -140,7 +138,6 @@ func ParseConfig() *Config {
 	flag.StringVar(&cfg.CustomWriter, "writer", "", "use custom writer plugin (format: 'dir:pluginName')")
 	flag.StringVar(&cfg.GeoCoordinates, "geo", "", "set geo coordinates for search (e.g., '37.7749,-122.4194')")
 	flag.IntVar(&cfg.Zoom, "zoom", 15, "set zoom level (0-21) for search")
-	flag.BoolVar(&cfg.WebRunner, "web", false, "run web server instead of crawling")
 	flag.StringVar(&cfg.DataFolder, "data-folder", "webdata", "data folder for web runner")
 	flag.StringVar(&proxies, "proxies", "", "comma separated list of proxies to use in the format protocol://user:pass@host:port example: socks5://localhost:9050 or http://user:pass@localhost:9050")
 	flag.BoolVar(&cfg.AwsLamdbaRunner, "aws-lambda", false, "run as AWS Lambda function")
@@ -251,8 +248,6 @@ func ParseConfig() *Config {
 		cfg.RunMode = RunModeAwsLambdaInvoker
 	case cfg.AwsLamdbaRunner:
 		cfg.RunMode = RunModeAwsLambda
-	case cfg.WebRunner || (cfg.Dsn == "" && cfg.InputFile == ""):
-		cfg.RunMode = RunModeWeb
 	case cfg.Dsn == "":
 		cfg.RunMode = RunModeFile
 	case cfg.ProduceOnly:

@@ -16,7 +16,6 @@ import (
 	"github.com/sadewadee/google-scraper/runner/installplaywright"
 	"github.com/sadewadee/google-scraper/runner/lambdaaws"
 	"github.com/sadewadee/google-scraper/runner/managerrunner"
-	"github.com/sadewadee/google-scraper/runner/webrunner"
 	"github.com/sadewadee/google-scraper/runner/workerrunner"
 	"golang.org/x/sync/errgroup"
 )
@@ -42,7 +41,7 @@ func main() {
 
 	cfg := runner.ParseConfig()
 
-	log.Printf("RunMode: %d (Manager=%v, Worker=%v, Web=%v)", cfg.RunMode, cfg.ManagerMode, cfg.WorkerMode, cfg.WebRunner)
+	log.Printf("RunMode: %d (Manager=%v, Worker=%v)", cfg.RunMode, cfg.ManagerMode, cfg.WorkerMode)
 
 	var pg *proxygate.ProxyGate
 	if cfg.ProxyGateEnabled {
@@ -115,12 +114,6 @@ func runnerFactory(cfg *runner.Config, pg *proxygate.ProxyGate) (runner.Runner, 
 		return databaserunner.New(cfg)
 	case runner.RunModeInstallPlaywright:
 		return installplaywright.New(cfg)
-	case runner.RunModeWeb:
-		log.Println("DEPRECATED: Web mode (-web) with SQLite is deprecated.")
-		log.Println("Consider using Manager/Worker mode for production deployments:")
-		log.Println("  Manager: ./gmaps-scraper -manager -dsn 'postgres://...' -redis-addr localhost:6379")
-		log.Println("  Worker:  ./gmaps-scraper -worker -manager-url http://localhost:8080 -redis-addr localhost:6379")
-		return webrunner.New(cfg)
 	case runner.RunModeAwsLambda:
 		return lambdaaws.New(cfg)
 	case runner.RunModeAwsLambdaInvoker:
