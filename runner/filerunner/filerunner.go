@@ -11,6 +11,7 @@ import (
 
 	"github.com/sadewadee/google-scraper/deduper"
 	"github.com/sadewadee/google-scraper/exiter"
+	"github.com/sadewadee/google-scraper/internal/emailvalidator"
 	"github.com/sadewadee/google-scraper/leadsdb"
 	"github.com/sadewadee/google-scraper/runner"
 	"github.com/sadewadee/google-scraper/tlmt"
@@ -76,6 +77,14 @@ func (r *fileRunner) Run(ctx context.Context) (err error) {
 	dedup := deduper.New()
 	exitMonitor := exiter.New()
 
+	var ev emailvalidator.Validator
+	if r.cfg.EmailValidatorKey != "" {
+		ev = emailvalidator.NewMoribouncerValidator(emailvalidator.Config{
+			APIKey: r.cfg.EmailValidatorKey,
+			APIURL: r.cfg.EmailValidatorURL,
+		})
+	}
+
 	seedJobs, err = runner.CreateSeedJobs(
 		r.cfg.FastMode,
 		r.cfg.LangCode,
@@ -87,6 +96,7 @@ func (r *fileRunner) Run(ctx context.Context) (err error) {
 		r.cfg.Radius,
 		dedup,
 		exitMonitor,
+		ev,
 		r.cfg.ExtraReviews,
 	)
 	if err != nil {

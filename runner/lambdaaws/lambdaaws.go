@@ -89,6 +89,7 @@ func (l *lambdaAwsRunner) handler(ctx context.Context, input lInput) error {
 		10000, // TODO support radius
 		nil,
 		exitMonitor,
+		nil, // Email validator not supported in lambda yet
 		input.ExtraReviews,
 	)
 	if err != nil {

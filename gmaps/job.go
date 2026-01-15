@@ -14,6 +14,7 @@ import (
 
 	"github.com/sadewadee/google-scraper/deduper"
 	"github.com/sadewadee/google-scraper/exiter"
+	"github.com/sadewadee/google-scraper/internal/emailvalidator"
 )
 
 type GmapJobOptions func(*GmapJob)
@@ -28,6 +29,7 @@ type GmapJob struct {
 	Deduper             deduper.Deduper
 	ExitMonitor         exiter.Exiter
 	ExtractExtraReviews bool
+	EmailValidator      emailvalidator.Validator
 }
 
 func NewGmapJob(
@@ -96,6 +98,12 @@ func WithExtraReviews() GmapJobOptions {
 	}
 }
 
+func WithEmailValidator(v emailvalidator.Validator) GmapJobOptions {
+	return func(j *GmapJob) {
+		j.EmailValidator = v
+	}
+}
+
 func (j *GmapJob) UseInResults() bool {
 	return false
 }
@@ -120,6 +128,9 @@ func (j *GmapJob) Process(ctx context.Context, resp *scrapemate.Response) (any, 
 		if j.ExitMonitor != nil {
 			jopts = append(jopts, WithPlaceJobExitMonitor(j.ExitMonitor))
 		}
+		if j.EmailValidator != nil {
+			jopts = append(jopts, WithPlaceJobEmailValidator(j.EmailValidator))
+		}
 
 		placeJob := NewPlaceJob(j.ID, j.LangCode, resp.URL, j.ExtractEmail, j.ExtractExtraReviews, jopts...)
 
@@ -130,6 +141,9 @@ func (j *GmapJob) Process(ctx context.Context, resp *scrapemate.Response) (any, 
 				jopts := []PlaceJobOptions{}
 				if j.ExitMonitor != nil {
 					jopts = append(jopts, WithPlaceJobExitMonitor(j.ExitMonitor))
+				}
+				if j.EmailValidator != nil {
+					jopts = append(jopts, WithPlaceJobEmailValidator(j.EmailValidator))
 				}
 
 				nextJob := NewPlaceJob(j.ID, j.LangCode, href, j.ExtractEmail, j.ExtractExtraReviews, jopts...)

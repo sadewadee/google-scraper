@@ -15,6 +15,7 @@ import (
 	"github.com/sadewadee/google-scraper/postgres"
 	"github.com/sadewadee/google-scraper/runner"
 	"github.com/sadewadee/google-scraper/tlmt"
+	"github.com/sadewadee/google-scraper/internal/emailvalidator"
 	"github.com/gosom/scrapemate"
 	"github.com/gosom/scrapemate/scrapemateapp"
 )
@@ -142,6 +143,14 @@ func (d *dbrunner) produceSeedJobs(ctx context.Context) error {
 		input = f
 	}
 
+	var ev emailvalidator.Validator
+	if d.cfg.EmailValidatorKey != "" {
+		ev = emailvalidator.NewMoribouncerValidator(emailvalidator.Config{
+			APIKey: d.cfg.EmailValidatorKey,
+			APIURL: d.cfg.EmailValidatorURL,
+		})
+	}
+
 	jobs, err := runner.CreateSeedJobs(
 		d.cfg.FastMode,
 		d.cfg.LangCode,
@@ -152,7 +161,8 @@ func (d *dbrunner) produceSeedJobs(ctx context.Context) error {
 		d.cfg.Zoom,
 		d.cfg.Radius,
 		nil,
-		nil,
+		nil, // Exit monitor not used in produce mode typically, or we should create one? passing nil for now
+		ev,
 		d.cfg.ExtraReviews,
 	)
 	if err != nil {

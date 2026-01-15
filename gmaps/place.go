@@ -10,6 +10,7 @@ import (
 	"github.com/gosom/scrapemate"
 
 	"github.com/sadewadee/google-scraper/exiter"
+	"github.com/sadewadee/google-scraper/internal/emailvalidator"
 )
 
 type PlaceJobOptions func(*PlaceJob)
@@ -21,6 +22,7 @@ type PlaceJob struct {
 	ExtractEmail        bool
 	ExitMonitor         exiter.Exiter
 	ExtractExtraReviews bool
+	EmailValidator      emailvalidator.Validator
 }
 
 func NewPlaceJob(parentID, langCode, u string, extractEmail, extraExtraReviews bool, opts ...PlaceJobOptions) *PlaceJob {
@@ -55,6 +57,12 @@ func NewPlaceJob(parentID, langCode, u string, extractEmail, extraExtraReviews b
 func WithPlaceJobExitMonitor(exitMonitor exiter.Exiter) PlaceJobOptions {
 	return func(j *PlaceJob) {
 		j.ExitMonitor = exitMonitor
+	}
+}
+
+func WithPlaceJobEmailValidator(validator emailvalidator.Validator) PlaceJobOptions {
+	return func(j *PlaceJob) {
+		j.EmailValidator = validator
 	}
 }
 
@@ -98,6 +106,9 @@ func (j *PlaceJob) Process(_ context.Context, resp *scrapemate.Response) (any, [
 		opts := []EmailExtractJobOptions{}
 		if j.ExitMonitor != nil {
 			opts = append(opts, WithEmailJobExitMonitor(j.ExitMonitor))
+		}
+		if j.EmailValidator != nil {
+			opts = append(opts, WithEmailValidatorOption(j.EmailValidator))
 		}
 
 		emailJob := NewEmailJob(j.ID, &entry, opts...)

@@ -13,6 +13,7 @@ import (
 	"github.com/sadewadee/google-scraper/deduper"
 	"github.com/sadewadee/google-scraper/exiter"
 	"github.com/sadewadee/google-scraper/gmaps"
+	"github.com/sadewadee/google-scraper/internal/emailvalidator"
 	"github.com/gosom/scrapemate"
 )
 
@@ -27,6 +28,7 @@ func CreateSeedJobs(
 	radius float64,
 	dedup deduper.Deduper,
 	exitMonitor exiter.Exiter,
+	emailValidator emailvalidator.Validator,
 	extraReviews bool,
 ) (jobs []scrapemate.IJob, err error) {
 	var lat, lon float64
@@ -94,6 +96,10 @@ func CreateSeedJobs(
 
 			if exitMonitor != nil {
 				opts = append(opts, gmaps.WithExitMonitor(exitMonitor))
+			}
+
+			if emailValidator != nil {
+				opts = append(opts, gmaps.WithEmailValidator(emailValidator))
 			}
 
 			if extraReviews {

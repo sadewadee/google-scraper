@@ -7,6 +7,7 @@ import (
 	"github.com/gosom/scrapemate"
 	"github.com/sadewadee/google-scraper/deduper"
 	"github.com/sadewadee/google-scraper/exiter"
+	"github.com/sadewadee/google-scraper/internal/emailvalidator"
 )
 
 // SeedJobConfig for creating seed jobs from API
@@ -22,6 +23,7 @@ type SeedJobConfig struct {
 	ExtraReviews   bool
 	Dedup          deduper.Deduper
 	ExitMonitor    exiter.Exiter
+	EmailValidator emailvalidator.Validator
 }
 
 // CreateSeedJobsFromKeywords creates seed jobs from a slice of keywords.
@@ -46,6 +48,7 @@ func CreateSeedJobsFromKeywords(cfg SeedJobConfig) ([]scrapemate.IJob, error) {
 		cfg.Radius,
 		cfg.Dedup,
 		cfg.ExitMonitor,
+		cfg.EmailValidator,
 		cfg.ExtraReviews,
 	)
 }

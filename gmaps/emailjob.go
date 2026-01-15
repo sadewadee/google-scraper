@@ -10,6 +10,7 @@ import (
 	"github.com/sadewadee/google-scraper/exiter"
 	"github.com/gosom/scrapemate"
 	"github.com/mcnijman/go-emailaddress"
+	"github.com/sadewadee/google-scraper/internal/emailvalidator"
 )
 
 type EmailExtractJobOptions func(*EmailExtractJob)
@@ -19,6 +20,7 @@ type EmailExtractJob struct {
 
 	Entry       *Entry
 	ExitMonitor exiter.Exiter
+	Validator   emailvalidator.Validator
 }
 
 func NewEmailJob(parentID string, entry *Entry, opts ...EmailExtractJobOptions) *EmailExtractJob {
@@ -50,6 +52,12 @@ func NewEmailJob(parentID string, entry *Entry, opts ...EmailExtractJobOptions) 
 func WithEmailJobExitMonitor(exitMonitor exiter.Exiter) EmailExtractJobOptions {
 	return func(j *EmailExtractJob) {
 		j.ExitMonitor = exitMonitor
+	}
+}
+
+func WithEmailValidatorOption(validator emailvalidator.Validator) EmailExtractJobOptions {
+	return func(j *EmailExtractJob) {
+		j.Validator = validator
 	}
 }
 
@@ -85,7 +93,34 @@ func (j *EmailExtractJob) Process(ctx context.Context, resp *scrapemate.Response
 	}
 
 	// Filter out placeholder/protected emails
-	j.Entry.Emails = filterInvalidEmails(emails)
+	emails = filterInvalidEmails(emails)
+
+	// If validation is enabled, validate emails
+	if j.Validator != nil && len(emails) > 0 {
+		var validatedEmails []string
+		for _, email := range emails {
+			res, err := j.Validator.Validate(ctx, email)
+			if err != nil {
+				// Log error but keep email if validation fails technically?
+				// Or discard? For now, if validation fails, we treat it as unknown and keep it
+				// UNLESS we want strict validation.
+				// Let's assume we keep it if validation fails due to network error,
+				// but if we get a result, we check ShouldAccept.
+				log.Error("Email validation failed", "email", email, "error", err)
+				validatedEmails = append(validatedEmails, email)
+				continue
+			}
+
+			if res.ShouldAccept() {
+				validatedEmails = append(validatedEmails, email)
+			} else {
+				log.Info("Email rejected by validator", "email", email, "reason", res.Reason, "status", res.Status)
+			}
+		}
+		emails = validatedEmails
+	}
+
+	j.Entry.Emails = emails
 
 	return j.Entry, nil, nil
 }
