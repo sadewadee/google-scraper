@@ -11,6 +11,8 @@ import (
 
 	"github.com/sadewadee/google-scraper/internal/domain"
 	"github.com/sadewadee/google-scraper/internal/queue"
+	"github.com/sadewadee/google-scraper/postgres"
+	"github.com/sadewadee/google-scraper/runner"
 )
 
 // Common errors
@@ -24,9 +26,10 @@ var (
 
 // JobService handles job business logic
 type JobService struct {
-	jobs    domain.JobRepository
-	results domain.ResultRepository
-	queue   *queue.Queue
+	jobs      domain.JobRepository
+	results   domain.ResultRepository
+	queue     *queue.Queue
+	gmapsPush postgres.GmapsJobPusher // Bridge to gmaps_jobs for DSN workers
 }
 
 // NewJobService creates a new JobService
@@ -35,6 +38,18 @@ func NewJobService(jobs domain.JobRepository, results domain.ResultRepository, q
 		jobs:    jobs,
 		results: results,
 		queue:   q,
+	}
+}
+
+// NewJobServiceWithBridge creates a new JobService with DSN bridge support.
+// The gmapsPush parameter enables bridging Dashboard jobs to gmaps_jobs table
+// so DSN workers can pick them up.
+func NewJobServiceWithBridge(jobs domain.JobRepository, results domain.ResultRepository, q *queue.Queue, gmapsPush postgres.GmapsJobPusher) *JobService {
+	return &JobService{
+		jobs:      jobs,
+		results:   results,
+		queue:     q,
+		gmapsPush: gmapsPush,
 	}
 }
 
@@ -54,6 +69,23 @@ func (s *JobService) Create(ctx context.Context, req *domain.CreateJobRequest) (
 
 	log.Printf("[JobService] Create completed in %v (db: %v)", time.Since(start), time.Since(dbStart))
 
+	// Bridge to gmaps_jobs for DSN workers (if configured)
+	if s.gmapsPush != nil {
+		bridgeStart := time.Now()
+		if err := s.bridgeToGmapsJobs(ctx, job); err != nil {
+			log.Printf("[JobService] WARNING: bridge to gmaps_jobs failed for job %s: %v", job.ID, err)
+			// Don't fail job creation - just log the error
+			// The Redis queue fallback can still work
+		} else {
+			log.Printf("[JobService] Job %s bridged to gmaps_jobs (%d tasks) in %v",
+				job.ID, job.Progress.TotalPlaces, time.Since(bridgeStart))
+			// Update job with total tasks count from bridge
+			if err := s.jobs.Update(ctx, job); err != nil {
+				log.Printf("[JobService] WARNING: failed to update total_tasks for job %s: %v", job.ID, err)
+			}
+		}
+	}
+
 	// Enqueue to Redis queue if available
 	if s.queue != nil {
 		if err := s.queue.Enqueue(ctx, job.ID, job.Priority); err != nil {
@@ -65,6 +97,47 @@ func (s *JobService) Create(ctx context.Context, req *domain.CreateJobRequest) (
 	}
 
 	return job, nil
+}
+
+// bridgeToGmapsJobs creates seed jobs and inserts them into gmaps_jobs table.
+// This bridges the Dashboard job (jobs_queue) to DSN workers (gmaps_jobs).
+func (s *JobService) bridgeToGmapsJobs(ctx context.Context, job *domain.Job) error {
+	// Build geo coordinates string
+	geoCoords := ""
+	if job.Config.GeoLat != nil && job.Config.GeoLon != nil {
+		geoCoords = runner.FormatGeoCoordinates(*job.Config.GeoLat, *job.Config.GeoLon)
+	}
+
+	// Create seed jobs from keywords
+	seedJobs, err := runner.CreateSeedJobsFromKeywords(runner.SeedJobConfig{
+		Keywords:       job.Config.Keywords,
+		FastMode:       job.Config.FastMode,
+		LangCode:       job.Config.Lang,
+		Depth:          job.Config.Depth,
+		Email:          job.Config.ExtractEmail,
+		GeoCoordinates: geoCoords,
+		Zoom:           job.Config.Zoom,
+		Radius:         float64(job.Config.Radius),
+		ExtraReviews:   false, // Not exposed in Dashboard yet
+		Dedup:          nil,   // Deduplication handled by workers
+		ExitMonitor:    nil,   // Not needed for bridge
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create seed jobs: %w", err)
+	}
+
+	// Push each seed job to gmaps_jobs with parent reference
+	parentID := job.ID.String()
+	for _, seedJob := range seedJobs {
+		if err := s.gmapsPush.PushWithParent(ctx, seedJob, parentID); err != nil {
+			return fmt.Errorf("failed to push seed job %s: %w", seedJob.GetID(), err)
+		}
+	}
+
+	// Update job with total tasks count
+	job.Progress.TotalPlaces = len(seedJobs)
+
+	return nil
 }
 
 // GetByID retrieves a job by ID

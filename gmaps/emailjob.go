@@ -149,6 +149,29 @@ var invalidEmailPatterns = []*regexp.Regexp{
 	// Wix protection/sentry emails
 	regexp.MustCompile(`@sentry\.wixpress\.com$`),
 	regexp.MustCompile(`@sentry-next\.wixpress\.com$`),
+
+	// Sentry/Error Tracking Domains
+	regexp.MustCompile(`@.*sentry\.io$`),
+	regexp.MustCompile(`@.*sentry\..+$`),
+	regexp.MustCompile(`@.*bugsnag\.com$`),
+	regexp.MustCompile(`@.*rollbar\.com$`),
+	regexp.MustCompile(`@.*errortracking\..+$`),
+
+	// Trapmail/Spam Trap/Disposable Domains
+	regexp.MustCompile(`@.*trapmail\..+$`),
+	regexp.MustCompile(`@.*spamtrap\..+$`),
+	regexp.MustCompile(`@.*honeypot\..+$`),
+	regexp.MustCompile(`@mailinator\.com$`),
+	regexp.MustCompile(`@guerrillamail\..+$`),
+	regexp.MustCompile(`@tempmail\..+$`),
+	regexp.MustCompile(`@throwaway\..+$`),
+	regexp.MustCompile(`@fakeinbox\.com$`),
+	regexp.MustCompile(`@temp-mail\..+$`),
+	regexp.MustCompile(`@10minutemail\.com$`),
+	regexp.MustCompile(`@yopmail\.com$`),
+	regexp.MustCompile(`@maildrop\.cc$`),
+	regexp.MustCompile(`@dispostable\.com$`),
+
 	// Placeholder/example domains
 	regexp.MustCompile(`@example\.(com|org|net)$`),
 	regexp.MustCompile(`@domain\.com$`),
@@ -160,19 +183,114 @@ var invalidEmailPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`@test\.com$`),
 	regexp.MustCompile(`@website\.com$`),
 	regexp.MustCompile(`@email\.com$`),
+	regexp.MustCompile(`@placeholder\..+$`),
+	regexp.MustCompile(`@dummy\..+$`),
+	regexp.MustCompile(`@fake\..+$`),
+	regexp.MustCompile(`@testing\..+$`),
+	regexp.MustCompile(`@localhost$`),
+	regexp.MustCompile(`@127\.0\.0\.1$`),
+	regexp.MustCompile(`@demo\..+$`),
+	regexp.MustCompile(`@sitename\..+$`),
+	regexp.MustCompile(`@mywebsite\..+$`),
+	regexp.MustCompile(`@changeme\..+$`),
+	regexp.MustCompile(`@youremail\..+$`),
+	regexp.MustCompile(`@your-email\..+$`),
+	regexp.MustCompile(`@mail\.com$`),
+
 	// No-reply patterns
 	regexp.MustCompile(`^noreply@`),
 	regexp.MustCompile(`^no-reply@`),
 	regexp.MustCompile(`^donotreply@`),
 	regexp.MustCompile(`^do-not-reply@`),
+
 	// UUID-like local parts (32+ hex chars)
 	regexp.MustCompile(`^[a-f0-9]{32,}@`),
+
 	// WordPress/CMS generic addresses
 	regexp.MustCompile(`@wordpress\.com$`),
+	regexp.MustCompile(`@wordpress\.org$`),
+	regexp.MustCompile(`@drupal\.org$`),
+	regexp.MustCompile(`@joomla\.org$`),
+	regexp.MustCompile(`@ghost\.org$`),
+	regexp.MustCompile(`@contentful\.com$`),
+	regexp.MustCompile(`@strapi\.io$`),
+	regexp.MustCompile(`@sanity\.io$`),
+	regexp.MustCompile(`@prismic\.io$`),
+	regexp.MustCompile(`@netlify\.com$`),
+	regexp.MustCompile(`@vercel\.com$`),
 	regexp.MustCompile(`^admin@`),
 	regexp.MustCompile(`^webmaster@`),
+
+	// Website Builders
+	regexp.MustCompile(`@wix\.com$`),
+	regexp.MustCompile(`@squarespace\.com$`),
+	regexp.MustCompile(`@weebly\.com$`),
+	regexp.MustCompile(`@webflow\.com$`),
+	regexp.MustCompile(`@duda\.co$`),
+	regexp.MustCompile(`@jimdo\.com$`),
+	regexp.MustCompile(`@site123\.com$`),
+	regexp.MustCompile(`@strikingly\.com$`),
+	regexp.MustCompile(`@carrd\.co$`),
+	regexp.MustCompile(`@webnode\.com$`),
+	regexp.MustCompile(`@zyro\.com$`),
+	regexp.MustCompile(`@tilda\.cc$`),
+	regexp.MustCompile(`@ucraft\.com$`),
+
+	// E-commerce Platforms
+	regexp.MustCompile(`@shopify\.com$`),
+	regexp.MustCompile(`@bigcommerce\.com$`),
+	regexp.MustCompile(`@woocommerce\.com$`),
+	regexp.MustCompile(`@magento\.com$`),
+	regexp.MustCompile(`@prestashop\.com$`),
+	regexp.MustCompile(`@ecwid\.com$`),
+	regexp.MustCompile(`@volusion\.com$`),
+	regexp.MustCompile(`@3dcart\.com$`),
+	regexp.MustCompile(`@bigcartel\.com$`),
+	regexp.MustCompile(`@storenvy\.com$`),
+
+	// Hosting Providers
+	regexp.MustCompile(`@godaddy\.com$`),
+	regexp.MustCompile(`@hostinger\.com$`),
+	regexp.MustCompile(`@bluehost\.com$`),
+	regexp.MustCompile(`@hostgator\.com$`),
+	regexp.MustCompile(`@namecheap\.com$`),
+	regexp.MustCompile(`@siteground\.com$`),
+	regexp.MustCompile(`@dreamhost\.com$`),
+	regexp.MustCompile(`@ionos\.com$`),
+	regexp.MustCompile(`@a2hosting\.com$`),
+	regexp.MustCompile(`@inmotionhosting\.com$`),
+	regexp.MustCompile(`@hover\.com$`),
+	regexp.MustCompile(`@register\.com$`),
+	regexp.MustCompile(`@networksolutions\.com$`),
+	regexp.MustCompile(`@cloudflare\.com$`),
+	regexp.MustCompile(`@digitalocean\.com$`),
+	regexp.MustCompile(`@linode\.com$`),
+	regexp.MustCompile(`@vultr\.com$`),
+	regexp.MustCompile(`@aws\.amazon\.com$`),
+	regexp.MustCompile(`@heroku\.com$`),
+
+	// Landing Page Builders
+	regexp.MustCompile(`@unbounce\.com$`),
+	regexp.MustCompile(`@leadpages\.com$`),
+	regexp.MustCompile(`@instapage\.com$`),
+	regexp.MustCompile(`@clickfunnels\.com$`),
+	regexp.MustCompile(`@landingi\.com$`),
+
+	// Form/Survey Builders
+	regexp.MustCompile(`@typeform\.com$`),
+	regexp.MustCompile(`@jotform\.com$`),
+	regexp.MustCompile(`@wufoo\.com$`),
+	regexp.MustCompile(`@formstack\.com$`),
+	regexp.MustCompile(`@cognito\.com$`),
+	regexp.MustCompile(`@surveymonkey\.com$`),
+	regexp.MustCompile(`@google\.com$`),
+
 	// Image file extensions (false positives from parsing)
 	regexp.MustCompile(`\.(png|jpg|jpeg|gif|svg|webp)$`),
+	regexp.MustCompile(`\.(ico|bmp|tiff|tif|eps|ai|psd|pdf|doc|docx)$`),
+	regexp.MustCompile(`\.(mp3|mp4|wav|avi|mov|wmv|flv|mkv)$`),
+	regexp.MustCompile(`\.(css|js|json|xml|html|htm|php|asp|aspx)$`),
+	regexp.MustCompile(`\.(zip|rar|7z|tar|gz)$`),
 }
 
 // filterInvalidEmails removes placeholder, protected, and invalid emails
@@ -203,7 +321,12 @@ func isValidBusinessEmail(email string) bool {
 	// Emails with 'sentry', 'placeholder', 'test' in domain
 	if strings.Contains(email, "@sentry.") ||
 		strings.Contains(email, "placeholder") ||
-		strings.Contains(email, "@test.") {
+		strings.Contains(email, "@test.") ||
+		strings.Contains(email, "trapmail") ||
+		strings.Contains(email, "spamtrap") ||
+		strings.Contains(email, "honeypot") ||
+		strings.Contains(email, "tempmail") ||
+		strings.Contains(email, "disposable") {
 		return false
 	}
 

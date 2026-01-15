@@ -101,6 +101,14 @@ type Config struct {
 	ProxyGateAddr            string
 	ProxyGateSources         []string
 	ProxyGateRefreshInterval time.Duration
+
+	// Email validation (Moribouncer)
+	EmailValidatorURL string
+	EmailValidatorKey string
+
+	// Migration flags
+	Migrate       bool // Run migration only, then exit
+	MigrateStatus bool // Check migration status and exit
 }
 
 func ParseConfig() *Config {
@@ -167,6 +175,14 @@ func ParseConfig() *Config {
 	flag.StringVar(&proxyGateSources, "proxygate-sources", "", "comma-separated proxy source URLs (uses defaults if empty)")
 	flag.DurationVar(&cfg.ProxyGateRefreshInterval, "proxygate-refresh", 10*time.Minute, "proxy refresh interval")
 
+	// Email validation flags
+	flag.StringVar(&cfg.EmailValidatorURL, "email-validator-url", "", "Email validation API URL (e.g., https://api.moribouncer.com/v1)")
+	flag.StringVar(&cfg.EmailValidatorKey, "email-validator-key", "", "Email validation API key (Moribouncer)")
+
+	// Migration flags
+	flag.BoolVar(&cfg.Migrate, "migrate", false, "Run auto-migration and exit")
+	flag.BoolVar(&cfg.MigrateStatus, "migrate-status", false, "Check migration status and exit")
+
 	flag.Parse()
 
 	if cfg.AwsAccessKey == "" {
@@ -179,6 +195,11 @@ func ParseConfig() *Config {
 
 	if cfg.AwsRegion == "" {
 		cfg.AwsRegion = os.Getenv("MY_AWS_REGION")
+	}
+
+	// Email validator environment variable fallback
+	if cfg.EmailValidatorKey == "" {
+		cfg.EmailValidatorKey = os.Getenv("MORIBOUNCER_API_KEY")
 	}
 
 	if cfg.AwsLambdaInvoker && cfg.FunctionName == "" {

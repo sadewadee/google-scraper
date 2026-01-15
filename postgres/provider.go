@@ -20,7 +20,15 @@ const (
 	batchSize    = 10
 )
 
+// GmapsJobPusher interface for pushing jobs to gmaps_jobs table.
+// Used by JobService to bridge Dashboard jobs to DSN workers.
+type GmapsJobPusher interface {
+	Push(ctx context.Context, job scrapemate.IJob) error
+	PushWithParent(ctx context.Context, job scrapemate.IJob, parentID string) error
+}
+
 var _ scrapemate.JobProvider = (*provider)(nil)
+var _ GmapsJobPusher = (*provider)(nil)
 
 type provider struct {
 	db        *sql.DB
@@ -46,6 +54,18 @@ func NewProvider(db *sql.DB, opts ...ProviderOption) scrapemate.JobProvider {
 	prov.jobc = make(chan scrapemate.IJob, 2*prov.batchSize)
 
 	return &prov
+}
+
+// NewGmapsJobPusher creates a GmapsJobPusher for pushing jobs to gmaps_jobs.
+// Used by JobService to bridge Dashboard jobs to DSN workers.
+func NewGmapsJobPusher(db *sql.DB) GmapsJobPusher {
+	return &provider{
+		db:        db,
+		mu:        &sync.Mutex{},
+		errc:      make(chan error, 1),
+		batchSize: batchSize,
+		jobc:      make(chan scrapemate.IJob, 2*batchSize),
+	}
 }
 
 // ProviderOption allows configuring the provider
@@ -105,10 +125,16 @@ func (p *provider) Jobs(ctx context.Context) (<-chan scrapemate.IJob, <-chan err
 
 // Push pushes a job to the job provider
 func (p *provider) Push(ctx context.Context, job scrapemate.IJob) error {
+	return p.PushWithParent(ctx, job, "")
+}
+
+// PushWithParent pushes a job with a parent job reference for Dashboard tracking.
+// The parentID links the gmaps_job back to the jobs_queue table.
+func (p *provider) PushWithParent(ctx context.Context, job scrapemate.IJob, parentID string) error {
 	q := `INSERT INTO gmaps_jobs
-		(id, priority, payload_type, payload, created_at, status)
+		(id, priority, payload_type, payload, created_at, status, parent_job_id)
 		VALUES
-		($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING`
+		($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING`
 
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
@@ -138,8 +164,14 @@ func (p *provider) Push(ctx context.Context, job scrapemate.IJob) error {
 		return fmt.Errorf("invalid job type %T", job)
 	}
 
+	// Handle empty parentID as NULL
+	var parentIDArg interface{}
+	if parentID != "" {
+		parentIDArg = parentID
+	}
+
 	_, err := p.db.ExecContext(ctx, q,
-		job.GetID(), job.GetPriority(), payloadType, buf.Bytes(), time.Now().UTC(), statusNew,
+		job.GetID(), job.GetPriority(), payloadType, buf.Bytes(), time.Now().UTC(), statusNew, parentIDArg,
 	)
 
 	return err

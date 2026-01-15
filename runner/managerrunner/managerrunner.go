@@ -19,11 +19,13 @@ import (
 	"github.com/sadewadee/google-scraper/internal/api/handlers"
 	"github.com/sadewadee/google-scraper/internal/domain"
 	"github.com/sadewadee/google-scraper/internal/heartbeat"
+	"github.com/sadewadee/google-scraper/internal/migration"
 	"github.com/sadewadee/google-scraper/internal/proxygate"
 	"github.com/sadewadee/google-scraper/internal/queue"
 	"github.com/sadewadee/google-scraper/internal/repository/postgres"
 	"github.com/sadewadee/google-scraper/internal/repository/sqlite"
 	"github.com/sadewadee/google-scraper/internal/service"
+	gmapspostgres "github.com/sadewadee/google-scraper/postgres"
 	"github.com/sadewadee/google-scraper/runner"
 	"golang.org/x/sync/errgroup"
 )
@@ -117,6 +119,13 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 			return nil, fmt.Errorf("failed to run migrations: %w", err)
 		}
 
+		// Run auto-migration for Dashboard → DSN bridge
+		log.Println("manager: running auto-migration for DSN bridge...")
+		if err := migration.AutoMigrate(context.Background(), db); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("auto-migrate failed: %w", err)
+		}
+
 		log.Println("manager: migrations completed, initializing repositories...")
 
 		// Initialize repositories
@@ -172,7 +181,17 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 	}
 
 	// Initialize services
-	jobSvc := service.NewJobService(jobRepo, resultRepo, jobQueue)
+	var jobSvc *service.JobService
+	if isPostgres {
+		// Use bridge to gmaps_jobs for DSN workers
+		gmapsPusher := gmapspostgres.NewGmapsJobPusher(db)
+		jobSvc = service.NewJobServiceWithBridge(jobRepo, resultRepo, jobQueue, gmapsPusher)
+		log.Println("manager: JobService initialized with DSN bridge (gmaps_jobs)")
+	} else {
+		// SQLite mode - no bridge (deprecated mode)
+		jobSvc = service.NewJobService(jobRepo, resultRepo, jobQueue)
+		log.Println("manager: WARNING - using deprecated SQLite mode without DSN bridge")
+	}
 	workerSvc := service.NewWorkerService(workerRepo, jobRepo)
 	resultSvc := service.NewResultService(resultRepo)
 	statsSvc := service.NewStatsService(jobRepo, workerRepo, resultRepo)
