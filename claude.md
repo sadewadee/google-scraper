@@ -161,3 +161,15 @@ Custom output writers can be implemented as Go plugins. See `examples/plugins` f
 - **Job Queue Priority**: RabbitMQ > Redis/Asynq > HTTP polling (graceful fallback)
 - **Caching**: Redis cache layer for Dashboard API endpoints (30s-120s TTL)
 - **Database Normalization**: `results` table auto-populates `business_listings` + `emails` via trigger
+
+## Documentation
+
+For detailed technical documentation, see:
+
+- **[Architecture Documentation](docs/ARCHITECTURE.md)** - Complete technical reference including:
+  - Database normalization layer (tables, triggers, views)
+  - Cache implementation (Redis, TTLs, invalidation)
+  - DSN Bridge mechanism (Dashboard → DSN workers)
+  - Worker deduplication (Redis SETNX)
+  - API endpoint reference (Jobs, Workers, Results)
+  - Message queue architecture (RabbitMQ)
