@@ -23,4 +23,6 @@ type JobStats struct {
 type PlaceStats struct {
 	TotalScraped int `json:"total_scraped"`
 	Today        int `json:"today"`
+	TotalEmails  int `json:"total_emails"`
+	RatePerHour  int `json:"rate_per_hour"`
 }

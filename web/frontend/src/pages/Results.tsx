@@ -34,11 +34,13 @@ import {
 } from "@mui/icons-material"
 import { StatCard } from "../components/StatCard"
 import type { ResultEntry } from "../api/types"
+import { ExportDialog } from "../components/Results/ExportDialog"
 
 export default function Results() {
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(50)
+  const [exportDialogOpen, setExportDialogOpen] = useState(false)
 
   // Fetch all results globally
   const { data: resultsData, isLoading } = useQuery({
@@ -66,8 +68,8 @@ export default function Results() {
 
   const total = resultsData?.meta?.total || 0
 
-  const handleExport = (format: 'csv' | 'xlsx' | 'json') => {
-    const url = resultsApi.downloadUrl(format)
+  const handleExport = (format: 'csv' | 'xlsx' | 'json', columns: string[]) => {
+    const url = resultsApi.downloadUrl(format, columns)
     window.open(url, '_blank')
   }
 
@@ -145,28 +147,16 @@ export default function Results() {
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Button
-              variant="outlined"
-              onClick={() => handleExport('csv')}
+              variant="contained"
+              onClick={() => setExportDialogOpen(true)}
               startIcon={<DownloadOutlined />}
-              sx={{ borderColor: '#E5E7EB', color: '#374151' }}
+              sx={{
+                bgcolor: '#000000',
+                color: '#FFFFFF',
+                '&:hover': { bgcolor: '#333333' }
+              }}
             >
-              CSV
-            </Button>
-            <Button
-              variant="outlined"
-              onClick={() => handleExport('xlsx')}
-              startIcon={<DownloadOutlined />}
-              sx={{ borderColor: '#E5E7EB', color: '#374151' }}
-            >
-              Excel
-            </Button>
-            <Button
-              variant="outlined"
-              onClick={() => handleExport('json')}
-              startIcon={<DownloadOutlined />}
-              sx={{ borderColor: '#E5E7EB', color: '#374151' }}
-            >
-              JSON
+              Export
             </Button>
           </Box>
         </Box>
@@ -306,6 +296,13 @@ export default function Results() {
           rowsPerPageOptions={[25, 50, 100]}
         />
       </Paper>
+
+      <ExportDialog
+        open={exportDialogOpen}
+        onClose={() => setExportDialogOpen(false)}
+        onExport={handleExport}
+        totalResults={total}
+      />
     </Box>
   )
 }

@@ -46,13 +46,16 @@ export default function Dashboard() {
     );
   }
 
-  const successRate = stats && stats.total_jobs > 0
-    ? ((stats.completed_jobs / stats.total_jobs) * 100).toFixed(1)
+  const successRate = stats && stats.jobs?.total > 0
+    ? ((stats.jobs.completed / stats.jobs.total) * 100).toFixed(1)
     : '0';
 
   const formatTimeAgo = (dateStr: string) => {
-    // eslint-disable-next-line react-hooks/purity
-    const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+    if (!dateStr) return 'never';
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return 'unknown';
+    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (seconds < 0) return 'just now';
     if (seconds < 60) return `${seconds}s ago`;
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
     if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
@@ -103,28 +106,28 @@ export default function Dashboard() {
       {/* Stats Cards - 4 columns x 2 rows */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid size={{ xs: 6, sm: 3 }}>
-          <StatCard title="Total Jobs" value={stats?.total_jobs || 0} subtitle="All time" icon={WorkOutlined} />
+          <StatCard title="Total Jobs" value={stats?.jobs?.total || 0} subtitle="All time" icon={WorkOutlined} />
         </Grid>
         <Grid size={{ xs: 6, sm: 3 }}>
-          <StatCard title="Active" value={stats?.active_jobs || 0} subtitle="Processing" icon={PlayArrowOutlined} />
+          <StatCard title="Active" value={(stats?.jobs?.running || 0) + (stats?.jobs?.queued || 0)} subtitle="Processing" icon={PlayArrowOutlined} />
         </Grid>
         <Grid size={{ xs: 6, sm: 3 }}>
-          <StatCard title="Completed" value={stats?.completed_jobs || 0} subtitle={`${successRate}% rate`} icon={CheckCircleOutlined} />
+          <StatCard title="Completed" value={stats?.jobs?.completed || 0} subtitle={`${successRate}% rate`} icon={CheckCircleOutlined} />
         </Grid>
         <Grid size={{ xs: 6, sm: 3 }}>
-          <StatCard title="Failed" value={stats?.failed_jobs || 0} subtitle="Errors" icon={ErrorOutlined} />
+          <StatCard title="Failed" value={stats?.jobs?.failed || 0} subtitle="Errors" icon={ErrorOutlined} />
         </Grid>
         <Grid size={{ xs: 6, sm: 3 }}>
-          <StatCard title="Results" value={stats?.total_results || 0} subtitle="Business listings" icon={StorageOutlined} />
+          <StatCard title="Results" value={stats?.places?.total_scraped || 0} subtitle="Business listings" icon={StorageOutlined} />
         </Grid>
         <Grid size={{ xs: 6, sm: 3 }}>
           <StatCard title="Workers" value={onlineWorkers} subtitle={`${workersList.length} total`} icon={DnsOutlined} />
         </Grid>
         <Grid size={{ xs: 6, sm: 3 }}>
-          <StatCard title="Rate" value="--" subtitle="per hour" icon={SpeedOutlined} />
+          <StatCard title="Rate" value={stats?.places?.rate_per_hour || 0} subtitle="per hour" icon={SpeedOutlined} />
         </Grid>
         <Grid size={{ xs: 6, sm: 3 }}>
-          <StatCard title="Emails" value="--" subtitle="Found" icon={EmailOutlined} />
+          <StatCard title="Emails" value={stats?.places?.total_emails || 0} subtitle="Found" icon={EmailOutlined} />
         </Grid>
       </Grid>
 
@@ -184,7 +187,7 @@ export default function Dashboard() {
                     <StatusChip status={worker.status} />
                   </Box>
                   <Typography variant="caption" sx={{ color: '#6B7280' }}>
-                    {worker.stats.jobs_completed} jobs | Last seen: {formatTimeAgo(worker.last_seen)}
+                    {worker.stats?.jobs_completed || 0} jobs | Last seen: {formatTimeAgo(worker.last_seen)}
                   </Typography>
                 </Box>
               ))}
