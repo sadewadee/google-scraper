@@ -110,6 +110,23 @@ type Config struct {
 	// Migration flags
 	Migrate       bool // Run migration only, then exit
 	MigrateStatus bool // Check migration status and exit
+
+	// Auto-spawn configuration (Manager mode)
+	SpawnerType        string            // none, docker, swarm, lambda
+	SpawnerImage       string            // Docker image for worker containers
+	SpawnerNetwork     string            // Docker network to attach workers
+	SpawnerConcurrency int               // Concurrency per spawned worker
+	SpawnerMaxWorkers  int               // Max concurrent workers (0 = unlimited)
+	SpawnerAutoRemove  bool              // Auto-remove containers after exit
+	SpawnerLabels      map[string]string // Labels for spawned containers
+	SpawnerConstraints []string          // Swarm placement constraints
+	SpawnerManagerURL  string            // Manager URL for spawned workers (default: auto-detect)
+
+	// AWS Lambda spawner configuration
+	SpawnerLambdaFunction   string // Lambda function name/ARN
+	SpawnerLambdaRegion     string // AWS region (defaults to AwsRegion)
+	SpawnerLambdaInvocation string // Event (async) or RequestResponse (sync)
+	SpawnerLambdaMaxConc    int    // Max concurrent Lambda invocations
 }
 
 func ParseConfig() *Config {
@@ -185,6 +202,19 @@ func ParseConfig() *Config {
 	// Migration flags
 	flag.BoolVar(&cfg.Migrate, "migrate", false, "Run auto-migration and exit")
 	flag.BoolVar(&cfg.MigrateStatus, "migrate-status", false, "Check migration status and exit")
+
+	// Auto-spawn flags (Manager mode)
+	flag.StringVar(&cfg.SpawnerType, "spawner", "none", "Worker spawner type: none, docker, swarm, lambda")
+	flag.StringVar(&cfg.SpawnerImage, "spawner-image", "gmaps-scraper:latest", "Docker image for spawned workers")
+	flag.StringVar(&cfg.SpawnerNetwork, "spawner-network", "gmaps-network", "Docker network for spawned workers")
+	flag.IntVar(&cfg.SpawnerConcurrency, "spawner-concurrency", 4, "Concurrency per spawned worker")
+	flag.IntVar(&cfg.SpawnerMaxWorkers, "spawner-max-workers", 0, "Max concurrent workers (0 = unlimited)")
+	flag.BoolVar(&cfg.SpawnerAutoRemove, "spawner-auto-remove", true, "Auto-remove containers after exit")
+	flag.StringVar(&cfg.SpawnerManagerURL, "spawner-manager-url", "", "Manager URL for spawned workers (e.g., http://manager:8080)")
+	flag.StringVar(&cfg.SpawnerLambdaFunction, "spawner-lambda-function", "", "AWS Lambda function name/ARN")
+	flag.StringVar(&cfg.SpawnerLambdaRegion, "spawner-lambda-region", "", "AWS region for Lambda (defaults to -aws-region)")
+	flag.StringVar(&cfg.SpawnerLambdaInvocation, "spawner-lambda-invocation", "Event", "Lambda invocation type: Event (async) or RequestResponse (sync)")
+	flag.IntVar(&cfg.SpawnerLambdaMaxConc, "spawner-lambda-max-conc", 100, "Max concurrent Lambda invocations")
 
 	flag.Parse()
 

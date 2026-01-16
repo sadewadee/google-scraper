@@ -68,6 +68,7 @@ type Config struct {
 	SpawnerAutoRemove  bool              // Auto-remove containers after exit
 	SpawnerLabels      map[string]string // Labels for spawned containers
 	SpawnerConstraints []string          // Swarm placement constraints
+	SpawnerManagerURL  string            // Manager URL for spawned workers (Dokploy: use service name)
 
 	// AWS Lambda spawner configuration
 	SpawnerLambdaFunction   string // Lambda function name/ARN
@@ -280,9 +281,26 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 	// Initialize spawner for auto-spawning workers
 	var workerSpawner spawner.Spawner
 	if cfg.SpawnerType != "" && cfg.SpawnerType != "none" {
+		// Determine Manager URL for spawned workers
+		// For Dokploy/Swarm: use service name (e.g., http://manager:8080)
+		// For local Docker: use host.docker.internal or localhost
+		managerURL := cfg.SpawnerManagerURL
+		if managerURL == "" {
+			// Auto-detect based on spawner type
+			if cfg.SpawnerType == "swarm" {
+				// For Swarm, try to use hostname as service name
+				hostname, _ := os.Hostname()
+				managerURL = fmt.Sprintf("http://%s%s", hostname, cfg.Address)
+				log.Printf("manager: auto-detected manager URL for Swarm: %s", managerURL)
+			} else {
+				// For local Docker, use localhost
+				managerURL = "http://localhost" + cfg.Address
+			}
+		}
+
 		spawnerCfg := &spawner.Config{
 			Type:        spawner.SpawnerType(cfg.SpawnerType),
-			ManagerURL:  "http://localhost" + cfg.Address, // Workers connect back to this manager
+			ManagerURL:  managerURL,
 			RabbitMQURL: cfg.RabbitMQURL,
 			RedisAddr:   cfg.RedisAddr,
 			Docker: spawner.DockerConfig{

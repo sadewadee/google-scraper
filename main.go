@@ -129,6 +129,20 @@ func runnerFactory(cfg *runner.Config, pg *proxygate.ProxyGate) (runner.Runner, 
 			RedisPass:    cfg.RedisPass,
 			RedisDB:      cfg.RedisDB,
 			RabbitMQURL:  cfg.RabbitMQURL,
+			// Spawner configuration
+			SpawnerType:             cfg.SpawnerType,
+			SpawnerImage:            cfg.SpawnerImage,
+			SpawnerNetwork:          cfg.SpawnerNetwork,
+			SpawnerConcurrency:      cfg.SpawnerConcurrency,
+			SpawnerMaxWorkers:       cfg.SpawnerMaxWorkers,
+			SpawnerAutoRemove:       cfg.SpawnerAutoRemove,
+			SpawnerLabels:           cfg.SpawnerLabels,
+			SpawnerConstraints:      cfg.SpawnerConstraints,
+			SpawnerManagerURL:       cfg.SpawnerManagerURL,
+			SpawnerLambdaFunction:   cfg.SpawnerLambdaFunction,
+			SpawnerLambdaRegion:     cfg.SpawnerLambdaRegion,
+			SpawnerLambdaInvocation: cfg.SpawnerLambdaInvocation,
+			SpawnerLambdaMaxConc:    cfg.SpawnerLambdaMaxConc,
 		}, pg)
 	case runner.RunModeWorker:
 		return workerrunner.New(&workerrunner.Config{

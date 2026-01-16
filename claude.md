@@ -140,6 +140,9 @@ docker-compose up -d --scale worker=4  # Scale to 4 workers
 | `-email` | Enable email crawling |
 | `-extra-reviews` | Collect detailed reviews |
 | `-proxies` | HTTP/SOCKS5 proxy list |
+| `-spawner` | Auto-spawn workers: docker, swarm, lambda, none |
+| `-spawner-image` | Docker image for spawned workers |
+| `-spawner-max-workers` | Max concurrent spawned workers |
 
 ## Entry Data Model
 
@@ -173,3 +176,9 @@ For detailed technical documentation, see:
   - Worker deduplication (Redis SETNX)
   - API endpoint reference (Jobs, Workers, Results)
   - Message queue architecture (RabbitMQ)
+
+- **[Auto-Spawn Workers](docs/AUTO_SPAWN.md)** - On-demand worker spawning:
+  - Docker spawner for local development
+  - Docker Swarm spawner for Dokploy deployments
+  - AWS Lambda spawner for serverless workloads
+  - Configuration flags and best practices

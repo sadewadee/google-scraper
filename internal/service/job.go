@@ -12,6 +12,7 @@ import (
 	"github.com/sadewadee/google-scraper/internal/domain"
 	"github.com/sadewadee/google-scraper/internal/mq"
 	"github.com/sadewadee/google-scraper/internal/queue"
+	"github.com/sadewadee/google-scraper/internal/spawner"
 	"github.com/sadewadee/google-scraper/postgres"
 	"github.com/sadewadee/google-scraper/runner"
 )
@@ -32,6 +33,7 @@ type JobService struct {
 	queue     *queue.Queue       // Redis queue (legacy)
 	mqPub     mq.Publisher       // RabbitMQ publisher (preferred)
 	gmapsPush postgres.GmapsJobPusher // Bridge to gmaps_jobs for DSN workers
+	spawner   spawner.Spawner    // Auto-spawn workers on job creation
 }
 
 // NewJobService creates a new JobService
@@ -64,6 +66,23 @@ func NewJobServiceWithMQ(jobs domain.JobRepository, results domain.ResultReposit
 		mqPub:     mqPub,
 		gmapsPush: gmapsPush,
 	}
+}
+
+// NewJobServiceWithSpawner creates a new JobService with auto-spawn support.
+// This is the recommended constructor for production Manager mode.
+func NewJobServiceWithSpawner(jobs domain.JobRepository, results domain.ResultRepository, mqPub mq.Publisher, gmapsPush postgres.GmapsJobPusher, sp spawner.Spawner) *JobService {
+	return &JobService{
+		jobs:      jobs,
+		results:   results,
+		mqPub:     mqPub,
+		gmapsPush: gmapsPush,
+		spawner:   sp,
+	}
+}
+
+// SetSpawner sets the worker spawner (can be called after construction)
+func (s *JobService) SetSpawner(sp spawner.Spawner) {
+	s.spawner = sp
 }
 
 // Create creates a new job
@@ -121,6 +140,11 @@ func (s *JobService) Create(ctx context.Context, req *domain.CreateJobRequest) (
 		}
 	}
 
+	// Auto-spawn worker if spawner is configured
+	if s.spawner != nil {
+		go s.spawnWorkerForJob(job)
+	}
+
 	return job, nil
 }
 
@@ -163,6 +187,32 @@ func (s *JobService) bridgeToGmapsJobs(ctx context.Context, job *domain.Job) err
 	job.Progress.TotalPlaces = len(seedJobs)
 
 	return nil
+}
+
+// spawnWorkerForJob spawns a worker container/function to process the job
+func (s *JobService) spawnWorkerForJob(job *domain.Job) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	req := &spawner.SpawnRequest{
+		JobID:       job.ID,
+		Priority:    job.Priority,
+		Concurrency: 4, // Default concurrency
+	}
+
+	result, err := s.spawner.Spawn(ctx, req)
+	if err != nil {
+		log.Printf("[JobService] WARNING: failed to spawn worker for job %s: %v", job.ID, err)
+		return
+	}
+
+	if result.Error != "" {
+		log.Printf("[JobService] WARNING: spawner returned error for job %s: %s", job.ID, result.Error)
+		return
+	}
+
+	log.Printf("[JobService] Spawned worker for job %s (worker: %s, status: %s, spawner: %s)",
+		job.ID, result.WorkerID, result.Status, s.spawner.Name())
 }
 
 // GetByID retrieves a job by ID
