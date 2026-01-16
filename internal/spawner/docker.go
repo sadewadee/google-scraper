@@ -66,7 +66,8 @@ func NewDockerSpawner(cfg *DockerConfig, managerURL, rabbitmqURL, redisAddr stri
 }
 
 func (s *DockerSpawner) Spawn(ctx context.Context, req *SpawnRequest) (*SpawnResult, error) {
-	// Check max workers limit
+	// Check max workers limit and reserve a slot atomically
+	reservationKey := "pending-" + req.JobID.String()
 	s.mu.Lock()
 	activeCount := len(s.containers)
 	if s.cfg.MaxWorkers > 0 && activeCount >= s.cfg.MaxWorkers {
@@ -78,7 +79,16 @@ func (s *DockerSpawner) Spawn(ctx context.Context, req *SpawnRequest) (*SpawnRes
 			Error:  "max workers limit reached",
 		}, nil
 	}
+	// Reserve a slot to prevent race condition
+	s.containers[reservationKey] = time.Now()
 	s.mu.Unlock()
+
+	// Ensure reservation is cleaned up on failure
+	defer func() {
+		s.mu.Lock()
+		delete(s.containers, reservationKey)
+		s.mu.Unlock()
+	}()
 
 	// Build container command
 	cmd := []string{

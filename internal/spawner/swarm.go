@@ -77,7 +77,8 @@ func NewSwarmSpawner(cfg *SwarmConfig, managerURL, rabbitmqURL, redisAddr string
 }
 
 func (s *SwarmSpawner) Spawn(ctx context.Context, req *SpawnRequest) (*SpawnResult, error) {
-	// Check max services limit
+	// Check max services limit and reserve a slot atomically
+	reservationKey := "pending-" + req.JobID.String()
 	s.mu.Lock()
 	activeCount := len(s.services)
 	if s.cfg.MaxServices > 0 && activeCount >= s.cfg.MaxServices {
@@ -89,7 +90,16 @@ func (s *SwarmSpawner) Spawn(ctx context.Context, req *SpawnRequest) (*SpawnResu
 			Error:  "max services limit reached",
 		}, nil
 	}
+	// Reserve a slot to prevent race condition
+	s.services[reservationKey] = time.Now()
 	s.mu.Unlock()
+
+	// Ensure reservation is cleaned up on failure
+	defer func() {
+		s.mu.Lock()
+		delete(s.services, reservationKey)
+		s.mu.Unlock()
+	}()
 
 	// Build container command
 	cmd := []string{

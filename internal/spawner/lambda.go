@@ -24,8 +24,14 @@ type LambdaSpawner struct {
 
 	// Track active invocations
 	mu          sync.Mutex
-	invocations map[string]string // requestID -> status
+	invocations map[string]invocationInfo // requestID -> info
 	activeCount int64
+}
+
+// invocationInfo tracks invocation state
+type invocationInfo struct {
+	status  string
+	isAsync bool // Only async invocations count toward activeCount
 }
 
 // LambdaPayload is the payload sent to the Lambda function
@@ -75,7 +81,7 @@ func NewLambdaSpawner(cfg *LambdaConfig, managerURL, rabbitmqURL, redisAddr stri
 		managerURL:  managerURL,
 		rabbitmqURL: rabbitmqURL,
 		redisAddr:   redisAddr,
-		invocations: make(map[string]string),
+		invocations: make(map[string]invocationInfo),
 	}, nil
 }
 
@@ -146,11 +152,14 @@ func (s *LambdaSpawner) Spawn(ctx context.Context, req *SpawnRequest) (*SpawnRes
 		atomic.AddInt64(&s.activeCount, 1)
 
 		s.mu.Lock()
-		s.invocations[requestID] = "invoked"
+		s.invocations[requestID] = invocationInfo{status: "invoked", isAsync: true}
 		s.mu.Unlock()
 	} else {
-		// Sync - Lambda completed
+		// Sync - Lambda completed, don't count toward active
 		requestID = req.JobID.String()
+		s.mu.Lock()
+		s.invocations[requestID] = invocationInfo{status: "completed", isAsync: false}
+		s.mu.Unlock()
 	}
 
 	log.Printf("[LambdaSpawner] Lambda invoked for job %s (status: %d)", req.JobID, result.StatusCode)
@@ -163,7 +172,7 @@ func (s *LambdaSpawner) Spawn(ctx context.Context, req *SpawnRequest) (*SpawnRes
 
 func (s *LambdaSpawner) Status(ctx context.Context, workerID string) (*SpawnResult, error) {
 	s.mu.Lock()
-	status, ok := s.invocations[workerID]
+	info, ok := s.invocations[workerID]
 	s.mu.Unlock()
 
 	if !ok {
@@ -175,7 +184,7 @@ func (s *LambdaSpawner) Status(ctx context.Context, workerID string) (*SpawnResu
 
 	return &SpawnResult{
 		WorkerID: workerID,
-		Status:   status,
+		Status:   info.status,
 	}, nil
 }
 
@@ -183,9 +192,12 @@ func (s *LambdaSpawner) Stop(ctx context.Context, workerID string) error {
 	// Lambda invocations cannot be stopped once started
 	// We can only mark them as cancelled in our tracking
 	s.mu.Lock()
-	if _, ok := s.invocations[workerID]; ok {
-		s.invocations[workerID] = "cancelled"
-		atomic.AddInt64(&s.activeCount, -1)
+	if info, ok := s.invocations[workerID]; ok {
+		// Only decrement activeCount if this was an async invocation
+		if info.isAsync && info.status != "completed" && info.status != "failed" && info.status != "cancelled" {
+			atomic.AddInt64(&s.activeCount, -1)
+		}
+		s.invocations[workerID] = invocationInfo{status: "cancelled", isAsync: info.isAsync}
 	}
 	s.mu.Unlock()
 
@@ -206,9 +218,12 @@ func (s *LambdaSpawner) Name() string {
 // This should be called when the worker reports job completion
 func (s *LambdaSpawner) MarkCompleted(workerID string) {
 	s.mu.Lock()
-	if _, ok := s.invocations[workerID]; ok {
-		s.invocations[workerID] = "completed"
-		atomic.AddInt64(&s.activeCount, -1)
+	if info, ok := s.invocations[workerID]; ok {
+		// Only decrement activeCount if this was an async invocation that's still active
+		if info.isAsync && info.status != "completed" && info.status != "failed" && info.status != "cancelled" {
+			atomic.AddInt64(&s.activeCount, -1)
+		}
+		s.invocations[workerID] = invocationInfo{status: "completed", isAsync: info.isAsync}
 	}
 	s.mu.Unlock()
 }
@@ -216,9 +231,12 @@ func (s *LambdaSpawner) MarkCompleted(workerID string) {
 // MarkFailed marks an invocation as failed
 func (s *LambdaSpawner) MarkFailed(workerID string) {
 	s.mu.Lock()
-	if _, ok := s.invocations[workerID]; ok {
-		s.invocations[workerID] = "failed"
-		atomic.AddInt64(&s.activeCount, -1)
+	if info, ok := s.invocations[workerID]; ok {
+		// Only decrement activeCount if this was an async invocation that's still active
+		if info.isAsync && info.status != "completed" && info.status != "failed" && info.status != "cancelled" {
+			atomic.AddInt64(&s.activeCount, -1)
+		}
+		s.invocations[workerID] = invocationInfo{status: "failed", isAsync: info.isAsync}
 	}
 	s.mu.Unlock()
 }
@@ -233,8 +251,8 @@ func (s *LambdaSpawner) CleanupOld() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for id, status := range s.invocations {
-		if status == "completed" || status == "failed" || status == "cancelled" {
+	for id, info := range s.invocations {
+		if info.status == "completed" || info.status == "failed" || info.status == "cancelled" {
 			delete(s.invocations, id)
 		}
 	}
