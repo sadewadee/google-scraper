@@ -144,8 +144,11 @@ services:
       - "-redis-addr=redis:6379"
       - "-rabbitmq-url=amqp://${RABBITMQ_USER:-gmaps}:${RABBITMQ_PASSWORD:-gmaps_secret}@rabbitmq:5672/"
       - "-static-folder=/usr/share/gmaps-scraper/static"
+      # ProxyGate configuration
+      - "-proxygate"
+      - "-proxygate-addr=:8081"
       # Auto-spawn worker configuration
-      - "-spawner-type=docker"
+      - "-spawner=docker"
       - "-spawner-image=${SPAWNER_IMAGE:-gmaps-scraper-rod:latest}"
       - "-spawner-network=${COMPOSE_PROJECT_NAME:-gmaps}_gmaps-network"
       - "-spawner-manager-url=http://manager:8080"
@@ -204,6 +207,7 @@ services:
       - "-redis-addr=redis:6379"
       - "-rabbitmq-url=amqp://${RABBITMQ_USER:-gmaps}:${RABBITMQ_PASSWORD:-gmaps_secret}@rabbitmq:5672/"
       - "-c=${CONCURRENCY:-4}"
+      - "-proxies=socks5://manager:8081"
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-gmaps}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-gmaps_secret}
