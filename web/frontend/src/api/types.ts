@@ -57,13 +57,36 @@ export interface Worker {
     }
 }
 
-export interface DashboardStats {
-    total_jobs: number
-    active_jobs: number
-    completed_jobs: number
-    failed_jobs: number
+// Backend Stats structure (matches domain.Stats in Go)
+export interface JobStats {
+    total: number
+    pending: number
+    queued: number
+    running: number
+    paused: number
+    completed: number
+    failed: number
+    cancelled: number
+}
+
+export interface WorkerStats {
+    total_workers: number
     online_workers: number
-    total_results: number
+    busy_workers: number
+    idle_workers: number
+}
+
+export interface PlaceStats {
+    total_scraped: number
+    today: number
+    total_emails: number
+    rate_per_hour: number
+}
+
+export interface DashboardStats {
+    jobs: JobStats
+    workers: WorkerStats
+    places: PlaceStats
 }
 
 export interface ApiResponse<T> {

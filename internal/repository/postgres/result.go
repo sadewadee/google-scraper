@@ -177,20 +177,38 @@ func (r *ResultRepository) GetPlaceStats(ctx context.Context) (*domain.PlaceStat
 	statsCtx, cancel := context.WithTimeout(ctx, resultStatsTimeout)
 	defer cancel()
 
-	// Use approximate count for total (faster), exact count for today
+	// Query for total results, today's results, total emails, and hourly rate
 	query := `
+		WITH result_stats AS (
+			SELECT
+				COALESCE(
+					(SELECT reltuples::bigint FROM pg_class WHERE relname = 'results'),
+					(SELECT COUNT(*) FROM results WHERE job_id IS NOT NULL)
+				)::int as total,
+				(SELECT COUNT(*) FROM results WHERE created_at >= CURRENT_DATE) as today,
+				(SELECT COUNT(*) FROM results WHERE created_at >= NOW() - INTERVAL '1 hour') as last_hour
+		),
+		email_stats AS (
+			SELECT COALESCE(
+				(SELECT reltuples::bigint FROM pg_class WHERE relname = 'emails'),
+				0
+			)::int as total_emails
+		)
 		SELECT
-			COALESCE(
-				(SELECT reltuples::bigint FROM pg_class WHERE relname = 'results'),
-				(SELECT COUNT(*) FROM results WHERE job_id IS NOT NULL)
-			)::int as total,
-			COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE) as today
-		FROM results
-		WHERE job_id IS NOT NULL AND created_at >= CURRENT_DATE
+			rs.total,
+			rs.today,
+			es.total_emails,
+			rs.last_hour as rate_per_hour
+		FROM result_stats rs, email_stats es
 	`
 
 	stats := &domain.PlaceStats{}
-	err := r.db.QueryRowContext(statsCtx, query).Scan(&stats.TotalScraped, &stats.Today)
+	err := r.db.QueryRowContext(statsCtx, query).Scan(
+		&stats.TotalScraped,
+		&stats.Today,
+		&stats.TotalEmails,
+		&stats.RatePerHour,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("stats query failed: %w", err)
 	}
