@@ -17,7 +17,8 @@ import {
     Box,
     InputAdornment,
     IconButton,
-    CircularProgress
+    CircularProgress,
+    Link
 } from "@mui/material"
 import { BusinessDetail } from "./BusinessDetail"
 import {
@@ -49,32 +50,30 @@ const AVAILABLE_COLUMNS: ColumnDef[] = [
         label: "Business Name",
         defaultVisible: true,
         render: (e, onSelect) => (
-            <button
-                type="button"
-                style={{
-                    background: 'none',
-                    border: 'none',
-                    padding: 0,
-                    font: 'inherit',
-                    cursor: 'pointer',
+            <Link
+                component="button"
+                variant="body2"
+                onClick={() => onSelect?.(e)}
+                sx={{
                     textAlign: 'left',
                     fontWeight: 500,
                     maxWidth: 200,
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
+                    whiteSpace: 'nowrap',
+                    display: 'block',
+                    cursor: 'pointer',
+                    textDecoration: 'none',
+                    color: 'text.primary',
+                    '&:hover': {
+                        color: 'primary.main',
+                        textDecoration: 'underline'
+                    }
                 }}
                 title={`View details for ${e.title}`}
-                onClick={(event) => {
-                    event.stopPropagation();
-                    event.preventDefault();
-                    onSelect?.(e);
-                }}
             >
-                <Box component="span" sx={{ '&:hover': { color: 'primary.main', textDecoration: 'underline' } }}>
-                    {e.title}
-                </Box>
-            </button>
+                {e.title}
+            </Link>
         ),
     },
     {

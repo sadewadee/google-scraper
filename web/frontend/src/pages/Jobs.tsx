@@ -31,7 +31,7 @@ export default function Jobs() {
   });
 
   const jobs = data?.data || [];
-  const total = data?.meta?.total || jobs.length;
+  const total = jobs.length;
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleString();

@@ -1,19 +1,19 @@
 import { api } from "./client"
-import type { Job, JobCreatePayload, ApiResponse, ResultsResponse } from "./types"
+import type { Job, JobCreatePayload, ResultsResponse } from "./types"
 
 export const jobsApi = {
-    getAll: async (): Promise<ApiResponse<Job[]>> => {
-        const response = await api.get<ApiResponse<Job[]>>("/jobs")
+    getAll: async (): Promise<{ data: Job[] }> => {
+        const response = await api.get<{ data: Job[] }>("/jobs")
         return response.data
     },
 
-    getOne: async (id: string): Promise<ApiResponse<Job>> => {
-        const response = await api.get<ApiResponse<Job>>(`/jobs/${id}`)
+    getOne: async (id: string): Promise<Job> => {
+        const response = await api.get<Job>(`/jobs/${id}`)
         return response.data
     },
 
-    create: async (data: JobCreatePayload): Promise<ApiResponse<Job>> => {
-        const response = await api.post<ApiResponse<Job>>("/jobs", data)
+    create: async (data: JobCreatePayload): Promise<Job> => {
+        const response = await api.post<Job>("/jobs", data)
         return response.data
     },
 

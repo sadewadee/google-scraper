@@ -33,13 +33,13 @@ export default function JobDetail() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
-  const { data: jobRes, isLoading } = useQuery({
+  const { data: job, isLoading } = useQuery({
     queryKey: ["job", id],
     queryFn: () => jobsApi.getOne(id!),
     enabled: !!id,
     refetchInterval: (query) => {
-      const job = query.state.data?.data
-      return job?.status === 'running' || job?.status === 'pending' ? 3000 : false
+      const jobData = query.state.data
+      return jobData?.status === 'running' || jobData?.status === 'pending' ? 3000 : false
     }
   })
 
@@ -86,8 +86,6 @@ export default function JobDetail() {
       toast.error("Failed to delete job")
     }
   })
-
-  const job = jobRes?.data
 
   if (isLoading) {
     return (
