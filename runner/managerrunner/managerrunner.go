@@ -27,6 +27,7 @@ import (
 	"github.com/sadewadee/google-scraper/internal/repository/postgres"
 	"github.com/sadewadee/google-scraper/internal/repository/sqlite"
 	"github.com/sadewadee/google-scraper/internal/service"
+	"github.com/sadewadee/google-scraper/internal/spawner"
 	gmapspostgres "github.com/sadewadee/google-scraper/postgres"
 	"github.com/sadewadee/google-scraper/runner"
 	"golang.org/x/sync/errgroup"
@@ -57,6 +58,22 @@ type Config struct {
 
 	// RabbitMQ configuration for job queue
 	RabbitMQURL string
+
+	// Spawner configuration for auto-spawning workers
+	SpawnerType        string            // none, docker, swarm, lambda
+	SpawnerImage       string            // Docker image for worker containers
+	SpawnerNetwork     string            // Docker network to attach workers
+	SpawnerConcurrency int               // Concurrency per spawned worker
+	SpawnerMaxWorkers  int               // Max concurrent workers (0 = unlimited)
+	SpawnerAutoRemove  bool              // Auto-remove containers after exit
+	SpawnerLabels      map[string]string // Labels for spawned containers
+	SpawnerConstraints []string          // Swarm placement constraints
+
+	// AWS Lambda spawner configuration
+	SpawnerLambdaFunction   string // Lambda function name/ARN
+	SpawnerLambdaRegion     string // AWS region for Lambda
+	SpawnerLambdaInvocation string // Event (async) or RequestResponse (sync)
+	SpawnerLambdaMaxConc    int    // Max concurrent Lambda invocations
 }
 
 // ManagerRunner runs the manager (Web UI + API) without scraping
@@ -73,6 +90,7 @@ type ManagerRunner struct {
 	jobQueue  *queue.Queue
 	mqPub     mq.Publisher
 	cache     cache.Cache
+	spawner   spawner.Spawner
 }
 
 // New creates a new ManagerRunner
@@ -101,6 +119,7 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 		workerRepo domain.WorkerRepository
 		resultRepo domain.ResultRepository
 		proxyRepo  domain.ProxyRepository
+		businessListingRepo domain.BusinessListingRepository
 		err        error
 	)
 
@@ -141,6 +160,9 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 		workerRepo = repos.Workers
 		resultRepo = repos.Results
 		proxyRepo = repos.Proxies
+
+		// Initialize BusinessListingRepository for normalized data access
+		businessListingRepo = postgres.NewBusinessListingRepository(db)
 	} else {
 		// Default to SQLite
 		if cfg.DatabaseURL == "" {
@@ -255,6 +277,51 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 	resultSvc := service.NewResultService(resultRepo)
 	statsSvc := service.NewStatsService(jobRepo, workerRepo, resultRepo)
 
+	// Initialize spawner for auto-spawning workers
+	var workerSpawner spawner.Spawner
+	if cfg.SpawnerType != "" && cfg.SpawnerType != "none" {
+		spawnerCfg := &spawner.Config{
+			Type:        spawner.SpawnerType(cfg.SpawnerType),
+			ManagerURL:  "http://localhost" + cfg.Address, // Workers connect back to this manager
+			RabbitMQURL: cfg.RabbitMQURL,
+			RedisAddr:   cfg.RedisAddr,
+			Docker: spawner.DockerConfig{
+				Image:       cfg.SpawnerImage,
+				Network:     cfg.SpawnerNetwork,
+				Concurrency: cfg.SpawnerConcurrency,
+				AutoRemove:  cfg.SpawnerAutoRemove,
+				MaxWorkers:  cfg.SpawnerMaxWorkers,
+				Environment: cfg.SpawnerLabels,
+			},
+			Swarm: spawner.SwarmConfig{
+				Image:       cfg.SpawnerImage,
+				Network:     cfg.SpawnerNetwork,
+				Concurrency: cfg.SpawnerConcurrency,
+				MaxServices: cfg.SpawnerMaxWorkers,
+				Labels:      cfg.SpawnerLabels,
+				Constraints: cfg.SpawnerConstraints,
+			},
+			Lambda: spawner.LambdaConfig{
+				FunctionName:   cfg.SpawnerLambdaFunction,
+				Region:         cfg.SpawnerLambdaRegion,
+				InvocationType: cfg.SpawnerLambdaInvocation,
+				MaxConcurrent:  cfg.SpawnerLambdaMaxConc,
+			},
+		}
+
+		sp, err := spawner.New(spawnerCfg)
+		if err != nil {
+			log.Printf("manager: WARNING - failed to initialize spawner: %v", err)
+			log.Println("manager: continuing without auto-spawn (workers must be started manually)")
+		} else {
+			workerSpawner = sp
+			jobSvc.SetSpawner(sp)
+			log.Printf("manager: spawner initialized (type: %s)", cfg.SpawnerType)
+		}
+	} else {
+		log.Println("manager: auto-spawn disabled (use -spawner docker|swarm|lambda to enable)")
+	}
+
 	log.Println("manager: services initialized, setting up router...")
 
 	// Initialize handlers with caching
@@ -291,6 +358,14 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 	workerHandler := handlers.NewWorkerHandler(workerSvc)
 	proxyHandler := handlers.NewProxyHandler(pg, proxyRepo)
 
+	// Create BusinessListingHandler for normalized data access (PostgreSQL only)
+	var businessListingHandler *handlers.BusinessListingHandler
+	if businessListingRepo != nil {
+		businessListingSvc := service.NewBusinessListingService(businessListingRepo)
+		businessListingHandler = handlers.NewBusinessListingHandler(businessListingSvc)
+		log.Println("manager: BusinessListingHandler initialized for normalized data access")
+	}
+
 	// Load sources if proxyRepo is available
 	if proxyRepo != nil && pg != nil {
 		ctx := context.Background()
@@ -316,7 +391,7 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 	}
 
 	// Setup router
-	router := api.NewRouter(jobHandler, workerHandler, statsHandler, proxyHandler, resultHandler)
+	router := api.NewRouter(jobHandler, workerHandler, statsHandler, proxyHandler, resultHandler, businessListingHandler)
 
 	// Set cached handlers for read operations if available
 	if cachedJobHandler != nil || cachedStatsHandler != nil || cachedResultHandler != nil {
@@ -402,6 +477,7 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 		jobQueue:  jobQueue,
 		mqPub:     mqPublisher,
 		cache:     redisCache,
+		spawner:   workerSpawner,
 	}, nil
 }
 
@@ -424,6 +500,9 @@ func (m *ManagerRunner) Run(ctx context.Context) error {
 
 // Close cleans up resources
 func (m *ManagerRunner) Close(_ context.Context) error {
+	if m.spawner != nil {
+		m.spawner.Close()
+	}
 	if m.mqPub != nil {
 		m.mqPub.Close()
 	}

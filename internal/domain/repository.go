@@ -143,3 +143,33 @@ type ProxyListRepository interface {
 	// GetStats retrieves proxy statistics
 	GetStats(ctx context.Context) (*ProxyStats, error)
 }
+
+// BusinessListingRepository defines the interface for business listing persistence
+type BusinessListingRepository interface {
+	// List retrieves business listings with filters and pagination
+	List(ctx context.Context, filter BusinessListingFilter) ([]*BusinessListing, int, error)
+
+	// ListByJobID retrieves business listings for a specific job
+	ListByJobID(ctx context.Context, jobID string, limit, offset int) ([]*BusinessListing, int, error)
+
+	// GetByID retrieves a single business listing by ID
+	GetByID(ctx context.Context, id int64) (*BusinessListing, error)
+
+	// GetCategories returns distinct categories
+	GetCategories(ctx context.Context, limit int) ([]string, error)
+
+	// GetCities returns distinct cities
+	GetCities(ctx context.Context, limit int) ([]string, error)
+
+	// Stats returns aggregate statistics
+	Stats(ctx context.Context) (*BusinessListingStats, error)
+
+	// Stream streams business listings for export
+	Stream(ctx context.Context, filter BusinessListingFilter, fn func(listing *BusinessListing) error) error
+
+	// StreamByJobID streams business listings for a specific job
+	StreamByJobID(ctx context.Context, jobID string, fn func(listing *BusinessListing) error) error
+
+	// CountByJobID counts business listings for a job
+	CountByJobID(ctx context.Context, jobID string) (int, error)
+}
