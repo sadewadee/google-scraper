@@ -51,8 +51,11 @@ export default function Dashboard() {
     : '0';
 
   const formatTimeAgo = (dateStr: string) => {
-    // eslint-disable-next-line react-hooks/purity
-    const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+    if (!dateStr) return 'never';
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return 'unknown';
+    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (seconds < 0) return 'just now';
     if (seconds < 60) return `${seconds}s ago`;
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
     if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
@@ -184,7 +187,7 @@ export default function Dashboard() {
                     <StatusChip status={worker.status} />
                   </Box>
                   <Typography variant="caption" sx={{ color: '#6B7280' }}>
-                    {worker.stats.jobs_completed} jobs | Last seen: {formatTimeAgo(worker.last_seen)}
+                    {worker.stats?.jobs_completed || 0} jobs | Last seen: {formatTimeAgo(worker.last_seen)}
                   </Typography>
                 </Box>
               ))}
