@@ -208,9 +208,22 @@ export default function Results() {
                 filteredResults.map((entry, idx) => (
                   <TableRow key={entry.place_id || entry.cid || idx} hover>
                     <TableCell>
-                      <Typography sx={{ fontWeight: 600, maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={entry.title}>
-                        {entry.title}
-                      </Typography>
+                      {entry.link ? (
+                        <Link
+                          href={entry.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          underline="hover"
+                          sx={{ fontWeight: 600, maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', color: 'inherit' }}
+                          title={entry.title}
+                        >
+                          {entry.title}
+                        </Link>
+                      ) : (
+                        <Typography sx={{ fontWeight: 600, maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={entry.title}>
+                          {entry.title}
+                        </Typography>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Chip
