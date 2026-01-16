@@ -91,10 +91,11 @@ export function JobForm({ cloneFrom, isRetry }: JobFormProps) {
         }
     }, [cloneFrom, isRetry, setValue])
 
-    const isFastMode = watch("fast_mode")
-    const isExtractEmail = watch("extract_email")
-    const lat = watch("lat")
-    const lon = watch("lon")
+    const values = watch()
+    const isFastMode = values.fast_mode
+    const isExtractEmail = values.extract_email
+    const lat = values.lat
+    const lon = values.lon
 
     // Check if form is ready for submission (especially for Fast Mode)
     const isReady = !isFastMode || (isFastMode && !!lat && !!lon)
@@ -239,17 +240,17 @@ export function JobForm({ cloneFrom, isRetry }: JobFormProps) {
                                 </Grid>
                             </Grid>
 
-                            <TextField
-                                label="Max Time (seconds)"
-                                type="number"
-                                slotProps={{ htmlInput: { min: 180 } }}
-                                fullWidth
-                                {...register("max_time", { valueAsNumber: true })}
-                                helperText="Minimum 180 seconds (3 minutes)"
-                            />
-                        </Stack>
-                    </MuiCardContent>
-                </MuiCard>
+                    <TextField
+                        label="Max Time (seconds)"
+                        type="number"
+                        slotProps={{ htmlInput: { min: 180 } }}
+                        fullWidth
+                        {...register("max_time", { valueAsNumber: true })}
+                        helperText="Minimum 180 seconds (3 minutes)"
+                    />
+                </Stack>
+            </MuiCardContent>
+        </MuiCard>
 
                 <MuiCard>
                     <MuiCardHeader title="Search Settings" />

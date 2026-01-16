@@ -16,7 +16,8 @@ import {
     Drawer,
     Box,
     InputAdornment,
-    IconButton
+    IconButton,
+    CircularProgress
 } from "@mui/material"
 import { BusinessDetail } from "./BusinessDetail"
 import {
@@ -328,12 +329,12 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
     }
 
     return (
-        <div className="space-y-4">
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {/* Toolbar */}
             <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1.5, justifyContent: 'space-between', mb: 2 }}>
-                <div className="flex gap-2 flex-1" style={{ display: 'flex', gap: 8, flex: 1 }}>
+                <div style={{ display: 'flex', gap: 8, flex: 1 }}>
                     {/* Search */}
-                    <div className="relative flex-1 max-w-sm" style={{ flex: 1, maxWidth: 400 }}>
+                    <div style={{ flex: 1, maxWidth: 400 }}>
                         <TextField
                             placeholder="Search results..."
                             value={search}
@@ -361,7 +362,7 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
 
 
                     {/* Column Picker */}
-                    <div className="relative" style={{ position: 'relative' }}>
+                    <div style={{ position: 'relative' }}>
                         <Button
                             variant="outlined"
                             style={{ minWidth: 40, padding: 8 }}
@@ -428,7 +429,7 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
                 </div>
 
                 {/* Export Buttons */}
-                <div className="flex gap-2" style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8 }}>
                     <Button variant="outlined" size="small" onClick={() => handleExport('csv')}>
                         <Download sx={{ mr: 1, fontSize: 16 }} />
                         CSV
@@ -442,12 +443,12 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
                         JSON
                     </Button>
                 </div>
-            </div>
+            </Box>
 
             {/* Results count */}
             <div style={{ fontSize: '0.875rem', color: 'text.secondary', marginBottom: 16 }}>
                 {search ? (
-                    <>Showing {filteredResults.length} of {total} results matching "{search}"</>
+                    <>Showing {filteredResults.length} of {total} results matching &quot;{search}&quot;</>
                 ) : (
                     <>Showing {((page - 1) * perPage) + 1}-{Math.min(page * perPage, total)} of {total} results</>
                 )}
@@ -467,8 +468,8 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
                         {isLoading ? (
                             <TableRow>
                                 <TableCell colSpan={visibleColumns.length} sx={{ textAlign: 'center', py: 8 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyItems: 'center', gap: 8 }}>
-                                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                                        <CircularProgress size={16} />
                                         Loading results...
                                     </div>
                                 </TableCell>
@@ -546,6 +547,6 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
                     </>
                 )}
             </Drawer>
-        </div>
+        </Box>
     )
 }
