@@ -83,7 +83,7 @@ func (h *BusinessListingHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if emailStatus := r.URL.Query().Get("email_status"); emailStatus != "" {
-		filter.EmailStatus = emailStatus
+		filter.EmailStatus = strings.ToLower(emailStatus)
 	}
 
 	listings, total, err := h.svc.List(ctx, filter)
@@ -164,7 +164,7 @@ func (h *BusinessListingHandler) Download(w http.ResponseWriter, r *http.Request
 	}
 
 	if emailStatus := r.URL.Query().Get("email_status"); emailStatus != "" {
-		filter.EmailStatus = emailStatus
+		filter.EmailStatus = strings.ToLower(emailStatus)
 	}
 
 	switch format {
