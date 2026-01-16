@@ -79,6 +79,10 @@ export interface ApiResponse<T> {
 export interface ProxyStats {
     total_proxies: number
     healthy_proxies: number
+    dead_proxies?: number
+    banned_proxies?: number
+    pending_proxies?: number
+    avg_uptime?: number
     last_updated: string
 }
 
@@ -90,6 +94,33 @@ export interface ProxySource {
     status?: 'ok' | 'error'
     error_message?: string
     created_at?: string
+}
+
+export interface Proxy {
+    id: number
+    ip: string
+    port: number
+    protocol: string
+    country?: string
+    uptime?: number
+    response_time?: number
+    status: 'pending' | 'healthy' | 'dead' | 'banned'
+    last_checked?: string
+    last_used?: string
+    fail_count: number
+    success_count: number
+    source_url?: string
+    created_at: string
+    updated_at: string
+}
+
+export interface ProxyListResponse {
+    data: Proxy[]
+    meta: {
+        total: number
+        page: number
+        limit: number
+    }
 }
 
 export interface Review {

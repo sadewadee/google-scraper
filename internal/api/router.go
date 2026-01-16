@@ -64,10 +64,12 @@ func (r *Router) Setup(token string) http.Handler {
 	}
 
 	// ProxyGate endpoints
-	r.mux.HandleFunc("/api/v2/proxygate/stats", r.proxy.GetStats)
+	r.mux.HandleFunc("/api/v2/proxygate/stats", r.proxy.GetProxyStats)
 	r.mux.HandleFunc("/api/v2/proxygate/sources", r.handleProxySources)
 	r.mux.HandleFunc("/api/v2/proxygate/sources/{id}", r.handleProxySource)
 	r.mux.HandleFunc("/api/v2/proxygate/refresh", r.proxy.Refresh)
+	r.mux.HandleFunc("/api/v2/proxygate/proxies", r.proxy.ListProxies)
+	r.mux.HandleFunc("/api/v2/proxygate/proxies/cleanup", r.proxy.DeleteDeadProxies)
 
 	// Job endpoints
 	r.mux.HandleFunc("/api/v2/jobs", r.handleJobs)

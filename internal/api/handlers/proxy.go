@@ -14,12 +14,18 @@ import (
 )
 
 type ProxyHandler struct {
-	pg   *proxygate.ProxyGate
-	repo domain.ProxyRepository
+	pg           *proxygate.ProxyGate
+	repo         domain.ProxyRepository
+	proxyListRepo domain.ProxyListRepository
 }
 
 func NewProxyHandler(pg *proxygate.ProxyGate, repo domain.ProxyRepository) *ProxyHandler {
 	return &ProxyHandler{pg: pg, repo: repo}
+}
+
+// SetProxyListRepo sets the proxy list repository for listing individual proxies
+func (h *ProxyHandler) SetProxyListRepo(repo domain.ProxyListRepository) {
+	h.proxyListRepo = repo
 }
 
 func (h *ProxyHandler) GetStats(w http.ResponseWriter, r *http.Request) {
@@ -224,4 +230,118 @@ func (h *ProxyHandler) DeleteSource(w http.ResponseWriter, r *http.Request) {
 
 func (h *ProxyHandler) UpdateSource(w http.ResponseWriter, r *http.Request) {
 	RenderError(w, http.StatusNotImplemented, "Not implemented yet")
+}
+
+// ListProxies returns paginated list of proxies from database
+func (h *ProxyHandler) ListProxies(w http.ResponseWriter, r *http.Request) {
+	if h.proxyListRepo == nil {
+		RenderJSON(w, http.StatusOK, map[string]interface{}{
+			"data": []interface{}{},
+			"meta": map[string]interface{}{
+				"total": 0,
+				"page":  1,
+				"limit": 50,
+			},
+		})
+		return
+	}
+
+	// Parse query params
+	query := r.URL.Query()
+	page, _ := strconv.Atoi(query.Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	limit, _ := strconv.Atoi(query.Get("limit"))
+	if limit < 1 || limit > 100 {
+		limit = 50
+	}
+	offset := (page - 1) * limit
+
+	status := query.Get("status")
+	country := query.Get("country")
+
+	params := domain.ProxyListParams{
+		Limit:  limit,
+		Offset: offset,
+	}
+	if status != "" {
+		params.Status = domain.ProxyStatus(status)
+	}
+	if country != "" {
+		params.Country = country
+	}
+
+	proxies, total, err := h.proxyListRepo.List(r.Context(), params)
+	if err != nil {
+		log.Printf("Failed to list proxies: %v", err)
+		RenderError(w, http.StatusInternalServerError, "Failed to list proxies")
+		return
+	}
+
+	RenderJSON(w, http.StatusOK, map[string]interface{}{
+		"data": proxies,
+		"meta": map[string]interface{}{
+			"total": total,
+			"page":  page,
+			"limit": limit,
+		},
+	})
+}
+
+// GetProxyStats returns proxy statistics from database
+func (h *ProxyHandler) GetProxyStats(w http.ResponseWriter, r *http.Request) {
+	if h.proxyListRepo == nil {
+		// Fallback to ProxyGate stats
+		h.GetStats(w, r)
+		return
+	}
+
+	stats, err := h.proxyListRepo.GetStats(r.Context())
+	if err != nil {
+		log.Printf("Failed to get proxy stats: %v", err)
+		RenderError(w, http.StatusInternalServerError, "Failed to get proxy stats")
+		return
+	}
+
+	// Also get last updated from ProxyGate if available
+	lastUpdatedStr := "never"
+	if h.pg != nil {
+		_, _, lastUpdated := h.pg.GetStats()
+		if !lastUpdated.IsZero() {
+			lastUpdatedStr = lastUpdated.Format(time.RFC3339)
+		}
+	}
+
+	RenderJSON(w, http.StatusOK, map[string]interface{}{
+		"data": map[string]interface{}{
+			"total_proxies":   stats.Total,
+			"healthy_proxies": stats.Healthy,
+			"dead_proxies":    stats.Dead,
+			"banned_proxies":  stats.Banned,
+			"pending_proxies": stats.Pending,
+			"avg_uptime":      stats.AvgUptime,
+			"last_updated":    lastUpdatedStr,
+		},
+	})
+}
+
+// DeleteDeadProxies removes all dead proxies from database
+func (h *ProxyHandler) DeleteDeadProxies(w http.ResponseWriter, r *http.Request) {
+	if h.proxyListRepo == nil {
+		RenderError(w, http.StatusServiceUnavailable, "Proxy list repository not configured")
+		return
+	}
+
+	count, err := h.proxyListRepo.DeleteDead(r.Context())
+	if err != nil {
+		log.Printf("Failed to delete dead proxies: %v", err)
+		RenderError(w, http.StatusInternalServerError, "Failed to delete dead proxies")
+		return
+	}
+
+	RenderJSON(w, http.StatusOK, map[string]interface{}{
+		"message": "Dead proxies deleted",
+		"count":   count,
+	})
 }

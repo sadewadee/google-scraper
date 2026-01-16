@@ -56,7 +56,15 @@ func (f *Fetcher) fetchAll(ctx context.Context) error {
 	f.mu.RUnlock()
 
 	for _, url := range sources {
-		if err := f.fetchOne(ctx, url); err != nil {
+		var err error
+		if IsProxyDBURL(url) {
+			// Use HTML scraper for proxydb.net
+			err = f.fetchProxyDB(ctx)
+		} else {
+			// Use plain text parser for other sources
+			err = f.fetchOne(ctx, url)
+		}
+		if err != nil {
 			log.Printf("[ProxyGate] Fetch from %s failed: %v", url, err)
 			continue
 		}

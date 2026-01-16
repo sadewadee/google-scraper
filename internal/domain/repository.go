@@ -107,3 +107,39 @@ type ProxyRepository interface {
 	// GetByID retrieves a proxy source by ID
 	GetByID(ctx context.Context, id int64) (*ProxySource, error)
 }
+
+// ProxyListRepository defines the interface for proxy list persistence
+type ProxyListRepository interface {
+	// Upsert creates or updates a proxy (based on IP:port unique constraint)
+	Upsert(ctx context.Context, proxy *Proxy) error
+
+	// UpsertBatch creates or updates multiple proxies
+	UpsertBatch(ctx context.Context, proxies []*Proxy) error
+
+	// GetByAddress retrieves a proxy by IP:port
+	GetByAddress(ctx context.Context, ip string, port int) (*Proxy, error)
+
+	// List retrieves proxies with optional filtering
+	List(ctx context.Context, params ProxyListParams) ([]*Proxy, int, error)
+
+	// ListHealthy retrieves all healthy proxies (for Pool)
+	ListHealthy(ctx context.Context) ([]*Proxy, error)
+
+	// UpdateStatus updates the status of a proxy
+	UpdateStatus(ctx context.Context, id int64, status ProxyStatus) error
+
+	// IncrementFailCount increments fail count and optionally marks as dead
+	IncrementFailCount(ctx context.Context, id int64, maxFails int) error
+
+	// IncrementSuccessCount increments success count
+	IncrementSuccessCount(ctx context.Context, id int64) error
+
+	// MarkUsed updates the last_used timestamp
+	MarkUsed(ctx context.Context, id int64) error
+
+	// DeleteDead removes all dead proxies
+	DeleteDead(ctx context.Context) (int, error)
+
+	// GetStats retrieves proxy statistics
+	GetStats(ctx context.Context) (*ProxyStats, error)
+}

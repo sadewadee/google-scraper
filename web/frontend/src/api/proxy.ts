@@ -1,5 +1,12 @@
 import { api } from "./client"
-import type { ProxyStats, ProxySource, ApiResponse } from "./types"
+import type { ProxyStats, ProxySource, Proxy, ProxyListResponse, ApiResponse } from "./types"
+
+export interface ProxyListParams {
+    page?: number
+    limit?: number
+    status?: 'pending' | 'healthy' | 'dead' | 'banned'
+    country?: string
+}
 
 export const proxyApi = {
     getStats: async (): Promise<ApiResponse<ProxyStats>> => {
@@ -28,6 +35,25 @@ export const proxyApi = {
 
     updateSource: async (id: number, active: boolean): Promise<ApiResponse<ProxySource>> => {
         const response = await api.patch<ApiResponse<ProxySource>>(`/proxygate/sources/${id}`, { active })
+        return response.data
+    },
+
+    // Proxy list endpoints
+    getProxies: async (params: ProxyListParams = {}): Promise<ProxyListResponse> => {
+        const queryParams = new URLSearchParams()
+        if (params.page) queryParams.set('page', params.page.toString())
+        if (params.limit) queryParams.set('limit', params.limit.toString())
+        if (params.status) queryParams.set('status', params.status)
+        if (params.country) queryParams.set('country', params.country)
+
+        const queryString = queryParams.toString()
+        const url = `/proxygate/proxies${queryString ? `?${queryString}` : ''}`
+        const response = await api.get<ProxyListResponse>(url)
+        return response.data
+    },
+
+    cleanupDeadProxies: async (): Promise<ApiResponse<{ message: string; count: number }>> => {
+        const response = await api.post<ApiResponse<{ message: string; count: number }>>("/proxygate/proxies/cleanup")
         return response.data
     }
 }
