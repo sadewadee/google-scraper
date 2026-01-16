@@ -39,6 +39,7 @@ type ResultServiceInterface interface {
 	CreateBatch(ctx context.Context, jobID uuid.UUID, data [][]byte) error
 	ListByJobID(ctx context.Context, jobID uuid.UUID, limit, offset int) ([][]byte, int, error)
 	StreamByJobID(ctx context.Context, jobID uuid.UUID, fn func(data []byte) error) error
+	CountByJobID(ctx context.Context, jobID uuid.UUID) (int, error)
 }
 
 // JobHandler handles job-related HTTP requests
@@ -101,6 +102,22 @@ func (h *JobHandler) SubmitResults(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("[SubmitResults] Job %s: Successfully saved %d results to database", id, len(batch.Data))
+
+	// Update scraped_places counter from actual database count
+	totalResults, countErr := h.results.CountByJobID(r.Context(), id)
+	if countErr != nil {
+		log.Printf("[SubmitResults] Job %s: WARNING - failed to count results: %v", id, countErr)
+	} else {
+		progress := domain.JobProgress{
+			ScrapedPlaces: totalResults,
+		}
+		if progressErr := h.jobs.UpdateProgress(r.Context(), id, progress); progressErr != nil {
+			log.Printf("[SubmitResults] Job %s: WARNING - failed to update progress: %v", id, progressErr)
+		} else {
+			log.Printf("[SubmitResults] Job %s: Updated scraped_places to %d", id, totalResults)
+		}
+	}
+
 	w.WriteHeader(http.StatusCreated)
 }
 
