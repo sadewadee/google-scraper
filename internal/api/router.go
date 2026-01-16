@@ -15,6 +15,9 @@ type Router struct {
 	proxy   *handlers.ProxyHandler
 	results *handlers.ResultHandler
 
+	// Business listings handler (normalized data from business_listings table)
+	businessListings *handlers.BusinessListingHandler
+
 	// Cached handlers for read operations (optional, set via SetCachedHandlers)
 	cachedJobs    *handlers.CachedJobHandler
 	cachedStats   *handlers.CachedStatsHandler
@@ -28,14 +31,16 @@ func NewRouter(
 	stats *handlers.StatsHandler,
 	proxy *handlers.ProxyHandler,
 	results *handlers.ResultHandler,
+	businessListings *handlers.BusinessListingHandler,
 ) *Router {
 	return &Router{
-		mux:     http.NewServeMux(),
-		jobs:    jobs,
-		workers: workers,
-		stats:   stats,
-		proxy:   proxy,
-		results: results,
+		mux:              http.NewServeMux(),
+		jobs:             jobs,
+		workers:          workers,
+		stats:            stats,
+		proxy:            proxy,
+		results:          results,
+		businessListings: businessListings,
 	}
 }
 
@@ -79,7 +84,7 @@ func (r *Router) Setup(token string) http.Handler {
 	r.mux.HandleFunc("/api/v2/jobs/{id}/resume", r.jobs.Resume)
 	r.mux.HandleFunc("/api/v2/jobs/{id}/cancel", r.jobs.Cancel)
 	r.mux.HandleFunc("/api/v2/jobs/{id}/results", r.handleJobResults)
-	r.mux.HandleFunc("/api/v2/jobs/{id}/download", r.jobs.DownloadResults)
+	r.mux.HandleFunc("/api/v2/jobs/{id}/download", r.handleJobDownload)
 
 	// Worker endpoints
 	r.mux.HandleFunc("/api/v2/workers", r.workers.List)
@@ -92,13 +97,24 @@ func (r *Router) Setup(token string) http.Handler {
 	r.mux.HandleFunc("/api/v2/workers/{id}/fail", r.workers.FailJob)
 	r.mux.HandleFunc("/api/v2/workers/{id}/release", r.workers.ReleaseJob)
 
-	// Global results endpoints (database view) - use cached handler if available
-	if r.cachedResults != nil {
+	// Global results endpoints - use business_listings table via BusinessListingHandler
+	// (Normalized data with proper columns, filtering, and export formats)
+	if r.businessListings != nil {
+		r.mux.HandleFunc("/api/v2/results", r.businessListings.List)
+		r.mux.HandleFunc("/api/v2/results/download", r.businessListings.Download)
+		r.mux.HandleFunc("/api/v2/results/categories", r.businessListings.GetCategories)
+		r.mux.HandleFunc("/api/v2/results/cities", r.businessListings.GetCities)
+		r.mux.HandleFunc("/api/v2/results/stats", r.businessListings.GetStats)
+		r.mux.HandleFunc("/api/v2/results/columns", r.businessListings.GetAvailableColumns)
+	} else if r.cachedResults != nil {
+		// Fallback to cached raw results handler
 		r.mux.HandleFunc("/api/v2/results", r.cachedResults.List)
+		r.mux.HandleFunc("/api/v2/results/download", r.results.Download)
 	} else {
+		// Fallback to raw results handler
 		r.mux.HandleFunc("/api/v2/results", r.results.List)
+		r.mux.HandleFunc("/api/v2/results/download", r.results.Download)
 	}
-	r.mux.HandleFunc("/api/v2/results/download", r.results.Download)
 
 	// Apply middleware
 	return Chain(r.mux,
@@ -201,8 +217,11 @@ func (r *Router) healthCheck(w http.ResponseWriter, req *http.Request) {
 func (r *Router) handleJobResults(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodGet:
-		// Use cached handler for read operations if available
-		if r.cachedJobs != nil {
+		// Use business listings handler (normalized data from business_listings table)
+		if r.businessListings != nil {
+			r.businessListings.ListByJobID(w, req)
+		} else if r.cachedJobs != nil {
+			// Fallback to cached raw results
 			r.cachedJobs.GetResults(w, req)
 		} else {
 			r.jobs.GetResults(w, req)
@@ -211,5 +230,16 @@ func (r *Router) handleJobResults(w http.ResponseWriter, req *http.Request) {
 		r.jobs.SubmitResults(w, req)
 	default:
 		handlers.RenderError(w, http.StatusMethodNotAllowed, "Method not allowed")
+	}
+}
+
+// handleJobDownload routes requests for /api/v2/jobs/{id}/download
+func (r *Router) handleJobDownload(w http.ResponseWriter, req *http.Request) {
+	// Use business listings handler (normalized data from business_listings table)
+	if r.businessListings != nil {
+		r.businessListings.DownloadByJobID(w, req)
+	} else {
+		// Fallback to raw results handler
+		r.jobs.DownloadResults(w, req)
 	}
 }
