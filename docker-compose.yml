@@ -144,6 +144,14 @@ services:
       - "-redis-addr=redis:6379"
       - "-rabbitmq-url=amqp://${RABBITMQ_USER:-gmaps}:${RABBITMQ_PASSWORD:-gmaps_secret}@rabbitmq:5672/"
       - "-static-folder=/usr/share/gmaps-scraper/static"
+      # Auto-spawn worker configuration
+      - "-spawner-type=docker"
+      - "-spawner-image=${SPAWNER_IMAGE:-gmaps-scraper-rod:latest}"
+      - "-spawner-network=${COMPOSE_PROJECT_NAME:-gmaps}_gmaps-network"
+      - "-spawner-manager-url=http://manager:8080"
+      - "-spawner-concurrency=${SPAWNER_CONCURRENCY:-4}"
+      - "-spawner-max-workers=${SPAWNER_MAX_WORKERS:-5}"
+      - "-spawner-auto-remove=true"
     ports:
       - "${WEB_PORT:-8080}:8080"
     environment:
@@ -151,9 +159,14 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-gmaps_secret}
       - POSTGRES_DB=${POSTGRES_DB:-gmaps}
       - API_TOKEN=${API_TOKEN}
+      # Spawner configuration (can be customized via .env)
+      - SPAWNER_IMAGE=${SPAWNER_IMAGE:-gmaps-scraper-rod:latest}
+      - SPAWNER_MAX_WORKERS=${SPAWNER_MAX_WORKERS:-5}
+      - SPAWNER_CONCURRENCY=${SPAWNER_CONCURRENCY:-4}
     volumes:
       - manager_data:/data
       - ./results:/results
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       db:
         condition: service_healthy
