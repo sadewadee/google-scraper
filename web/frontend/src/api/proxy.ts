@@ -1,5 +1,5 @@
 import { api } from "./client"
-import type { ProxyStats, ProxySource, Proxy, ProxyListResponse, ApiResponse } from "./types"
+import type { ProxyStats, ProxySource, ProxyListResponse, ApiResponse } from "./types"
 
 export interface ProxyListParams {
     page?: number

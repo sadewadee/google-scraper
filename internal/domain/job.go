@@ -114,6 +114,19 @@ type CreateJobRequest struct {
 	Priority     int      `json:"priority" validate:"min=0,max=100"`
 }
 
+// EstimateTotalPlaces estimates total places based on job config
+// Each keyword typically yields approximately depth results
+func (r *CreateJobRequest) EstimateTotalPlaces() int {
+	if len(r.Keywords) == 0 {
+		return 0
+	}
+	depth := r.Depth
+	if depth == 0 {
+		depth = 10 // default depth
+	}
+	return len(r.Keywords) * depth
+}
+
 // ToJob converts a CreateJobRequest to a Job
 func (r *CreateJobRequest) ToJob() *Job {
 	now := time.Now().UTC()
@@ -150,12 +163,17 @@ func (r *CreateJobRequest) ToJob() *Job {
 	}
 
 	return &Job{
-		ID:        uuid.New(),
-		Name:      r.Name,
-		Status:    JobStatusPending,
-		Priority:  r.Priority,
-		Config:    config,
-		Progress:  JobProgress{},
+		ID:       uuid.New(),
+		Name:     r.Name,
+		Status:   JobStatusPending,
+		Priority: r.Priority,
+		Config:   config,
+		Progress: JobProgress{
+			TotalPlaces:   r.EstimateTotalPlaces(),
+			ScrapedPlaces: 0,
+			FailedPlaces:  0,
+			Percentage:    0,
+		},
 		CreatedAt: now,
 		UpdatedAt: now,
 	}

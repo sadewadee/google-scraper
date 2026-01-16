@@ -169,7 +169,7 @@ export default function ProxyGate() {
       case 'pending': return <HourglassEmptyOutlined sx={{ fontSize: 14 }} />;
       case 'dead': return <ErrorOutlined sx={{ fontSize: 14 }} />;
       case 'banned': return <BlockOutlined sx={{ fontSize: 14 }} />;
-      default: return null;
+      default: return undefined;
     }
   };
 
