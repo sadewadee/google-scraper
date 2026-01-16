@@ -63,7 +63,6 @@ const AVAILABLE_COLUMNS: ColumnDef[] = [
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap'
                 }}
-                className="hover:text-primary hover:underline"
                 title={`View details for ${e.title}`}
                 onClick={(event) => {
                     event.stopPropagation();
@@ -71,7 +70,9 @@ const AVAILABLE_COLUMNS: ColumnDef[] = [
                     onSelect?.(e);
                 }}
             >
-                {e.title}
+                <Box component="span" sx={{ '&:hover': { color: 'primary.main', textDecoration: 'underline' } }}>
+                    {e.title}
+                </Box>
             </button>
         ),
     },
@@ -101,10 +102,21 @@ const AVAILABLE_COLUMNS: ColumnDef[] = [
         render: (e) => (
             <div style={{ fontSize: '0.875rem' }}>
                 {e.phone ? (
-                    <a href={`tel:${e.phone}`} style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'inherit', textDecoration: 'none' }} className="hover:text-primary">
+                    <Box
+                        component="a"
+                        href={`tel:${e.phone}`}
+                        sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 0.5,
+                            color: 'inherit',
+                            textDecoration: 'none',
+                            '&:hover': { color: 'primary.main' }
+                        }}
+                    >
                         <Phone sx={{ fontSize: 12 }} />
                         {e.phone}
-                    </a>
+                    </Box>
                 ) : (
                     <span style={{ color: 'text.secondary' }}>-</span>
                 )}
@@ -118,16 +130,23 @@ const AVAILABLE_COLUMNS: ColumnDef[] = [
         render: (e) => (
             <div style={{ fontSize: '0.875rem', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {e.web_site ? (
-                    <a
+                    <Box
+                        component="a"
                         href={e.web_site}
                         target="_blank"
                         rel="noopener noreferrer"
-                        style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'inherit', textDecoration: 'none' }}
-                        className="hover:text-primary"
+                        sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 0.5,
+                            color: 'inherit',
+                            textDecoration: 'none',
+                            '&:hover': { color: 'primary.main' }
+                        }}
                     >
                         <ExternalLink sx={{ fontSize: 12, flexShrink: 0 }} />
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{new URL(e.web_site).hostname}</span>
-                    </a>
+                    </Box>
                 ) : (
                     <span style={{ color: 'text.secondary' }}>-</span>
                 )}
@@ -141,13 +160,24 @@ const AVAILABLE_COLUMNS: ColumnDef[] = [
         render: (e) => (
             <div style={{ fontSize: '0.875rem' }}>
                 {e.emails && e.emails.length > 0 ? (
-                    <a href={`mailto:${e.emails[0]}`} style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'inherit', textDecoration: 'none' }} className="hover:text-primary">
+                    <Box
+                        component="a"
+                        href={`mailto:${e.emails[0]}`}
+                        sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 0.5,
+                            color: 'inherit',
+                            textDecoration: 'none',
+                            '&:hover': { color: 'primary.main' }
+                        }}
+                    >
                         <Mail sx={{ fontSize: 12 }} />
                         {e.emails[0]}
                         {e.emails.length > 1 && (
                             <Badge variant="outlined" size="small" label={`+${e.emails.length - 1}`} sx={{ ml: 0.5, fontSize: '0.65rem', height: 16 }} />
                         )}
-                    </a>
+                    </Box>
                 ) : (
                     <span style={{ color: 'text.secondary' }}>-</span>
                 )}
@@ -206,15 +236,19 @@ const AVAILABLE_COLUMNS: ColumnDef[] = [
         defaultVisible: false,
         render: (e) => (
             e.link ? (
-                <a
+                <Box
+                    component="a"
                     href={e.link}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ fontSize: '0.875rem', color: 'inherit' }}
-                    className="hover:text-primary"
+                    sx={{
+                        fontSize: '0.875rem',
+                        color: 'inherit',
+                        '&:hover': { color: 'primary.main' }
+                    }}
                 >
                     <ExternalLink sx={{ fontSize: 16 }} />
-                </a>
+                </Box>
             ) : <span style={{ color: 'text.secondary' }}>-</span>
         ),
     },
@@ -278,16 +312,25 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
 
     if (error) {
         return (
-            <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-center text-destructive">
+            <Box sx={{
+                borderRadius: 1,
+                border: 1,
+                borderColor: 'error.light',
+                bgcolor: 'error.light',
+                p: 2,
+                textAlign: 'center',
+                color: 'error.contrastText',
+                opacity: 0.9
+            }}>
                 Failed to load results. Please try again.
-            </div>
+            </Box>
         )
     }
 
     return (
         <div className="space-y-4">
             {/* Toolbar */}
-            <div className="flex flex-col sm:flex-row gap-3 justify-between" style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1.5, justifyContent: 'space-between', mb: 2 }}>
                 <div className="flex gap-2 flex-1" style={{ display: 'flex', gap: 8, flex: 1 }}>
                     {/* Search */}
                     <div className="relative flex-1 max-w-sm" style={{ flex: 1, maxWidth: 400 }}>
@@ -315,6 +358,7 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
                             }}
                         />
                     </div>
+
 
                     {/* Column Picker */}
                     <div className="relative" style={{ position: 'relative' }}>

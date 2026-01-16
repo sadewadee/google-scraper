@@ -16,7 +16,6 @@ import {
   useTheme,
   useMediaQuery,
   Avatar,
-  Chip,
 } from '@mui/material';
 import {
   Menu as MenuIcon,

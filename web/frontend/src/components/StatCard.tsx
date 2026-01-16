@@ -1,4 +1,4 @@
-import { Card, CardContent, Typography, Box, useMediaQuery, useTheme } from '@mui/material';
+import { Card, CardContent, Typography, Box } from '@mui/material';
 import type { SvgIconProps } from '@mui/material/SvgIcon';
 import type { ComponentType } from 'react';
 
@@ -15,8 +15,6 @@ export const StatCard = ({
   subtitle,
   icon: Icon,
 }: StatCardProps) => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   return (
     <Card

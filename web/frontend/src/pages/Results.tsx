@@ -15,7 +15,7 @@ import {
   TablePagination,
   TextField,
   InputAdornment,
-  Grid2 as Grid,
+  Grid,
   Chip,
   IconButton,
   Link,
