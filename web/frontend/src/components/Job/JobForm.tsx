@@ -5,7 +5,6 @@ import { AxiosError } from "axios"
 import { toast } from "sonner"
 import { jobsApi } from "@/api/jobs"
 import type { JobCreatePayload, Job } from "@/api/types"
-import { AlertCircle, CheckCircle2 } from "lucide-react"
 import {
     TextField,
     Button,
@@ -23,6 +22,7 @@ import {
     Stack,
     Grid
 } from "@mui/material"
+import { Error as ErrorIcon, CheckCircle } from "@mui/icons-material"
 
 interface FormData {
     name: string
@@ -342,13 +342,13 @@ export function JobForm({ cloneFrom, isRetry }: JobFormProps) {
                 </MuiCard>
 
                 {error && (
-                    <Alert severity="error" icon={<AlertCircle className="h-4 w-4" />}>
+                    <Alert severity="error" icon={<ErrorIcon sx={{ fontSize: 16 }} />}>
                         {error}
                     </Alert>
                 )}
 
                 {success && (
-                    <Alert severity="success" icon={<CheckCircle2 className="h-4 w-4" />}>
+                    <Alert severity="success" icon={<CheckCircle sx={{ fontSize: 16 }} />}>
                         Job created successfully! Redirecting...
                     </Alert>
                 )}

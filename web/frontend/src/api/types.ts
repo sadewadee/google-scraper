@@ -89,6 +89,7 @@ export interface ProxySource {
     last_fetch?: string
     status?: 'ok' | 'error'
     error_message?: string
+    created_at?: string
 }
 
 export interface Review {

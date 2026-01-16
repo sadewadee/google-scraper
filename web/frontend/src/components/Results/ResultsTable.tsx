@@ -402,9 +402,11 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
                                                 background: 'transparent',
                                                 cursor: 'pointer',
                                                 textAlign: 'left',
-                                                fontSize: '0.875rem'
+                                                fontSize: '0.875rem',
+                                                transition: 'background-color 0.15s'
                                             }}
-                                            className="hover:bg-gray-100"
+                                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.04)'}
+                                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                                         >
                                             <div style={{
                                                 width: 16,

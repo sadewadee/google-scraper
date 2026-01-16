@@ -1,4 +1,3 @@
-import { MapPin, Phone, Mail, Globe, Star, Clock, Calendar, Image as ImageIcon } from "lucide-react"
 import type { ResultEntry, Review } from "../../api/types"
 import {
     Chip,
@@ -10,6 +9,16 @@ import {
     Avatar,
     Paper
 } from "@mui/material"
+import {
+    Place as MapPin,
+    Phone,
+    Mail,
+    Language as Globe,
+    Star,
+    AccessTime as Clock,
+    CalendarMonth as Calendar,
+    Image as ImageIcon
+} from "@mui/icons-material"
 
 interface BusinessDetailProps {
     data: ResultEntry
@@ -54,7 +63,7 @@ export function BusinessDetail({ data }: BusinessDetailProps) {
                             />
                             {data.review_rating > 0 && (
                                 <Box display="flex" alignItems="center" color="warning.main" gap={0.5}>
-                                    <Star size={16} fill="currentColor" />
+                                    <Star sx={{ fontSize: 16 }} />
                                     <Typography variant="body2" fontWeight="medium">
                                         {data.review_rating}
                                     </Typography>
@@ -73,7 +82,7 @@ export function BusinessDetail({ data }: BusinessDetailProps) {
                     {data.web_site && (
                         <Button
                             variant="outlined"
-                            startIcon={<Globe size={16} />}
+                            startIcon={<Globe sx={{ fontSize: 16 }} />}
                             href={data.web_site}
                             target="_blank"
                             rel="noopener noreferrer"
@@ -84,7 +93,7 @@ export function BusinessDetail({ data }: BusinessDetailProps) {
                     )}
                     <Button
                         variant="outlined"
-                        startIcon={<MapPin size={16} />}
+                        startIcon={<MapPin sx={{ fontSize: 16 }} />}
                         href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(data.title + " " + data.address)}&query_place_id=${data.place_id}`}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -95,7 +104,7 @@ export function BusinessDetail({ data }: BusinessDetailProps) {
                     {data.phone && (
                         <Button
                             variant="outlined"
-                            startIcon={<Phone size={16} />}
+                            startIcon={<Phone sx={{ fontSize: 16 }} />}
                             href={`tel:${data.phone.replace(/\D/g, '')}`}
                             sx={{ flex: 1 }}
                         >
@@ -109,7 +118,7 @@ export function BusinessDetail({ data }: BusinessDetailProps) {
             {data.images && data.images.length > 0 && (
                 <Stack spacing={2}>
                     <Typography variant="subtitle1" fontWeight="bold" display="flex" alignItems="center" gap={1}>
-                        <ImageIcon size={18} /> Photos
+                        <ImageIcon sx={{ fontSize: 18 }} /> Photos
                     </Typography>
                     <Box
                         sx={{
@@ -152,21 +161,21 @@ export function BusinessDetail({ data }: BusinessDetailProps) {
                         <Stack spacing={2}>
                             {data.address && (
                                 <Box display="flex" gap={1.5} alignItems="flex-start">
-                                    <MapPin size={16} style={{ marginTop: 4, flexShrink: 0 }} />
+                                    <MapPin sx={{ fontSize: 16, mt: 0.5, flexShrink: 0 }} />
                                     <Typography variant="body2">{formatAddress()}</Typography>
                                 </Box>
                             )}
 
                             {data.phone && (
                                 <Box display="flex" gap={1.5} alignItems="center">
-                                    <Phone size={16} style={{ flexShrink: 0 }} />
+                                    <Phone sx={{ fontSize: 16, flexShrink: 0 }} />
                                     <Typography variant="body2">{data.phone}</Typography>
                                 </Box>
                             )}
 
                             {data.emails && data.emails.length > 0 && (
                                 <Box display="flex" gap={1.5} alignItems="flex-start">
-                                    <Mail size={16} style={{ marginTop: 4, flexShrink: 0 }} />
+                                    <Mail sx={{ fontSize: 16, mt: 0.5, flexShrink: 0 }} />
                                     <Box>
                                         {data.emails.map((email, i) => (
                                             <Typography
@@ -209,7 +218,7 @@ export function BusinessDetail({ data }: BusinessDetailProps) {
 
                             {data.timezone && (
                                 <Box display="flex" gap={1.5} alignItems="center">
-                                    <Clock size={16} style={{ flexShrink: 0 }} />
+                                    <Clock sx={{ fontSize: 16, flexShrink: 0 }} />
                                     <Typography variant="body2">{data.timezone}</Typography>
                                 </Box>
                             )}
@@ -222,7 +231,7 @@ export function BusinessDetail({ data }: BusinessDetailProps) {
             {data.open_hours && Object.keys(data.open_hours).length > 0 && (
                 <Paper variant="outlined" sx={{ p: 2 }}>
                     <Typography variant="overline" color="text.secondary" fontWeight="bold" gutterBottom display="flex" alignItems="center" gap={1}>
-                        <Calendar size={16} /> Operating Hours
+                        <Calendar sx={{ fontSize: 16 }} /> Operating Hours
                     </Typography>
                     <Stack spacing={1}>
                         {Object.entries(data.open_hours).map(([day, hours]) => (
@@ -259,9 +268,10 @@ export function BusinessDetail({ data }: BusinessDetailProps) {
                                             {Array.from({ length: 5 }).map((_, i) => (
                                                 <Star
                                                     key={i}
-                                                    size={14}
-                                                    fill={i < review.rating ? "currentColor" : "none"}
-                                                    color={i < review.rating ? "inherit" : "#e0e0e0"}
+                                                    sx={{
+                                                        fontSize: 14,
+                                                        color: i < review.rating ? 'inherit' : '#e0e0e0'
+                                                    }}
                                                 />
                                             ))}
                                         </Box>
