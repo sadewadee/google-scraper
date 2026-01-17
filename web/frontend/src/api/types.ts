@@ -15,6 +15,10 @@ export interface Job {
         extract_email: boolean
         max_time: number
         proxies?: string[]
+        location_name?: string
+        boundingbox?: BoundingBox
+        coverage_mode?: "single" | "full"
+        grid_points?: number
     }
     progress: {
         total_places: number
@@ -30,6 +34,13 @@ export interface Job {
     error_message?: string
 }
 
+export interface BoundingBox {
+    min_lat: number
+    max_lat: number
+    min_lon: number
+    max_lon: number
+}
+
 export interface JobCreatePayload {
     name: string
     keywords: string[]
@@ -43,6 +54,9 @@ export interface JobCreatePayload {
     max_time: number
     lat?: number
     lon?: number
+    location_name?: string
+    boundingbox?: BoundingBox
+    coverage_mode?: "single" | "full"
 }
 
 export interface Worker {

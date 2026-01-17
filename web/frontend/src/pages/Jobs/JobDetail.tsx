@@ -237,15 +237,23 @@ export default function JobDetail() {
               </Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
                 <Typography variant="body2" sx={{ color: '#6B7280' }}>Location:</Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <LocationOn sx={{ fontSize: 14, mr: 0.5, color: '#6B7280' }} />
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {job.config.geo_lat && job.config.geo_lon
-                      ? `${job.config.geo_lat}, ${job.config.geo_lon}`
-                      : "Auto"}
+                <Box sx={{ display: 'flex', alignItems: 'center', maxWidth: 180 }}>
+                  <LocationOn sx={{ fontSize: 14, mr: 0.5, color: '#6B7280', flexShrink: 0 }} />
+                  <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={job.config.location_name || undefined}>
+                    {job.config.location_name
+                      ? job.config.location_name.split(',')[0] // Show first part (city name)
+                      : job.config.geo_lat && job.config.geo_lon
+                        ? `${job.config.geo_lat.toFixed(4)}, ${job.config.geo_lon.toFixed(4)}`
+                        : "Auto"}
                   </Typography>
                 </Box>
               </Box>
+              {job.config.coverage_mode === 'full' && (
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+                  <Typography variant="body2" sx={{ color: '#6B7280' }}>Coverage:</Typography>
+                  <Chip label={`Full (${job.config.grid_points || 1} points)`} size="small" color="primary" variant="outlined" sx={{ height: 20, fontSize: '0.7rem' }} />
+                </Box>
+              )}
             </Box>
           </Paper>
         </Grid>

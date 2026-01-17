@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -112,19 +113,31 @@ func (r *JobRepository) Create(ctx context.Context, job *domain.Job) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
+	// Serialize boundingbox to JSON
+	var boundingboxJSON []byte
+	if job.Config.BoundingBox != nil {
+		var err error
+		boundingboxJSON, err = json.Marshal(job.Config.BoundingBox)
+		if err != nil {
+			return fmt.Errorf("failed to marshal boundingbox: %w", err)
+		}
+	}
+
 	query := `
 		INSERT INTO jobs_queue (
 			id, name, status, priority,
 			keywords, lang, geo_lat, geo_lon, zoom, radius, depth,
 			fast_mode, extract_email, max_time, proxies,
+			location_name, boundingbox, coverage_mode, grid_points,
 			total_places, scraped_places, failed_places,
 			created_at, updated_at
 		) VALUES (
 			$1, $2, $3, $4,
 			$5, $6, $7, $8, $9, $10, $11,
 			$12, $13, $14, $15,
-			$16, $17, $18,
-			$19, $20
+			$16, $17, $18, $19,
+			$20, $21, $22,
+			$23, $24
 		)
 	`
 
@@ -134,6 +147,7 @@ func (r *JobRepository) Create(ctx context.Context, job *domain.Job) error {
 		pq.Array(job.Config.Keywords), job.Config.Lang, job.Config.GeoLat, job.Config.GeoLon,
 		job.Config.Zoom, job.Config.Radius, job.Config.Depth,
 		job.Config.FastMode, job.Config.ExtractEmail, IntervalDuration(job.Config.MaxTime), pq.Array(job.Config.Proxies),
+		job.Config.LocationName, boundingboxJSON, job.Config.CoverageMode, job.Config.GridPoints,
 		job.Progress.TotalPlaces, job.Progress.ScrapedPlaces, job.Progress.FailedPlaces,
 		job.CreatedAt, job.UpdatedAt,
 	)
@@ -158,6 +172,7 @@ func (r *JobRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Job,
 			id, name, status, priority,
 			keywords, lang, geo_lat, geo_lon, zoom, radius, depth,
 			fast_mode, extract_email, max_time, proxies,
+			location_name, boundingbox, coverage_mode, grid_points,
 			total_places, scraped_places, failed_places,
 			worker_id, created_at, updated_at, started_at, completed_at,
 			error_message
@@ -168,12 +183,17 @@ func (r *JobRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Job,
 	job := &domain.Job{}
 	var keywords, proxies pq.StringArray
 	var maxTime IntervalDuration
+	var locationName sql.NullString
+	var boundingboxJSON []byte
+	var coverageMode sql.NullString
+	var gridPoints sql.NullInt32
 
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&job.ID, &job.Name, &job.Status, &job.Priority,
 		&keywords, &job.Config.Lang, &job.Config.GeoLat, &job.Config.GeoLon,
 		&job.Config.Zoom, &job.Config.Radius, &job.Config.Depth,
 		&job.Config.FastMode, &job.Config.ExtractEmail, &maxTime, &proxies,
+		&locationName, &boundingboxJSON, &coverageMode, &gridPoints,
 		&job.Progress.TotalPlaces, &job.Progress.ScrapedPlaces, &job.Progress.FailedPlaces,
 		&job.WorkerID, &job.CreatedAt, &job.UpdatedAt, &job.StartedAt, &job.CompletedAt,
 		&job.ErrorMessage,
@@ -189,6 +209,24 @@ func (r *JobRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Job,
 	job.Config.Keywords = keywords
 	job.Config.Proxies = proxies
 	job.Config.MaxTime = time.Duration(maxTime)
+
+	// Parse location fields
+	if locationName.Valid {
+		job.Config.LocationName = locationName.String
+	}
+	if len(boundingboxJSON) > 0 {
+		var bbox domain.BoundingBox
+		if err := json.Unmarshal(boundingboxJSON, &bbox); err == nil {
+			job.Config.BoundingBox = &bbox
+		}
+	}
+	if coverageMode.Valid {
+		job.Config.CoverageMode = domain.CoverageMode(coverageMode.String)
+	}
+	if gridPoints.Valid {
+		job.Config.GridPoints = int(gridPoints.Int32)
+	}
+
 	job.Progress.CalculatePercentage()
 
 	return job, nil
@@ -269,6 +307,7 @@ func (r *JobRepository) List(ctx context.Context, params domain.JobListParams) (
 			id, name, status, priority,
 			keywords, lang, geo_lat, geo_lon, zoom, radius, depth,
 			fast_mode, extract_email, max_time, proxies,
+			location_name, boundingbox, coverage_mode, grid_points,
 			total_places, scraped_places, failed_places,
 			worker_id, created_at, updated_at, started_at, completed_at,
 			error_message
@@ -291,12 +330,17 @@ func (r *JobRepository) List(ctx context.Context, params domain.JobListParams) (
 		job := &domain.Job{}
 		var keywords, proxies pq.StringArray
 		var maxTime IntervalDuration
+		var locationName sql.NullString
+		var boundingboxJSON []byte
+		var coverageMode sql.NullString
+		var gridPoints sql.NullInt32
 
 		err := rows.Scan(
 			&job.ID, &job.Name, &job.Status, &job.Priority,
 			&keywords, &job.Config.Lang, &job.Config.GeoLat, &job.Config.GeoLon,
 			&job.Config.Zoom, &job.Config.Radius, &job.Config.Depth,
 			&job.Config.FastMode, &job.Config.ExtractEmail, &maxTime, &proxies,
+			&locationName, &boundingboxJSON, &coverageMode, &gridPoints,
 			&job.Progress.TotalPlaces, &job.Progress.ScrapedPlaces, &job.Progress.FailedPlaces,
 			&job.WorkerID, &job.CreatedAt, &job.UpdatedAt, &job.StartedAt, &job.CompletedAt,
 			&job.ErrorMessage,
@@ -308,6 +352,24 @@ func (r *JobRepository) List(ctx context.Context, params domain.JobListParams) (
 		job.Config.Keywords = keywords
 		job.Config.Proxies = proxies
 		job.Config.MaxTime = time.Duration(maxTime)
+
+		// Parse location fields
+		if locationName.Valid {
+			job.Config.LocationName = locationName.String
+		}
+		if len(boundingboxJSON) > 0 {
+			var bbox domain.BoundingBox
+			if err := json.Unmarshal(boundingboxJSON, &bbox); err == nil {
+				job.Config.BoundingBox = &bbox
+			}
+		}
+		if coverageMode.Valid {
+			job.Config.CoverageMode = domain.CoverageMode(coverageMode.String)
+		}
+		if gridPoints.Valid {
+			job.Config.GridPoints = int(gridPoints.Int32)
+		}
+
 		job.Progress.CalculatePercentage()
 
 		jobs = append(jobs, job)
@@ -318,15 +380,26 @@ func (r *JobRepository) List(ctx context.Context, params domain.JobListParams) (
 
 // Update updates a job
 func (r *JobRepository) Update(ctx context.Context, job *domain.Job) error {
+	// Serialize boundingbox to JSON
+	var boundingboxJSON []byte
+	if job.Config.BoundingBox != nil {
+		var err error
+		boundingboxJSON, err = json.Marshal(job.Config.BoundingBox)
+		if err != nil {
+			return fmt.Errorf("failed to marshal boundingbox: %w", err)
+		}
+	}
+
 	query := `
 		UPDATE jobs_queue SET
 			name = $2, status = $3, priority = $4,
 			keywords = $5, lang = $6, geo_lat = $7, geo_lon = $8,
 			zoom = $9, radius = $10, depth = $11,
 			fast_mode = $12, extract_email = $13, max_time = $14, proxies = $15,
-			total_places = $16, scraped_places = $17, failed_places = $18,
-			worker_id = $19, started_at = $20, completed_at = $21,
-			error_message = $22
+			location_name = $16, boundingbox = $17, coverage_mode = $18, grid_points = $19,
+			total_places = $20, scraped_places = $21, failed_places = $22,
+			worker_id = $23, started_at = $24, completed_at = $25,
+			error_message = $26
 		WHERE id = $1
 	`
 
@@ -335,6 +408,7 @@ func (r *JobRepository) Update(ctx context.Context, job *domain.Job) error {
 		pq.Array(job.Config.Keywords), job.Config.Lang, job.Config.GeoLat, job.Config.GeoLon,
 		job.Config.Zoom, job.Config.Radius, job.Config.Depth,
 		job.Config.FastMode, job.Config.ExtractEmail, IntervalDuration(job.Config.MaxTime), pq.Array(job.Config.Proxies),
+		job.Config.LocationName, boundingboxJSON, job.Config.CoverageMode, job.Config.GridPoints,
 		job.Progress.TotalPlaces, job.Progress.ScrapedPlaces, job.Progress.FailedPlaces,
 		job.WorkerID, job.StartedAt, job.CompletedAt,
 		job.ErrorMessage,

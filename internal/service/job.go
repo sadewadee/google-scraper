@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/gosom/scrapemate"
 
 	"github.com/sadewadee/google-scraper/internal/domain"
 	"github.com/sadewadee/google-scraper/internal/mq"
@@ -151,40 +152,87 @@ func (s *JobService) Create(ctx context.Context, req *domain.CreateJobRequest) (
 // bridgeToGmapsJobs creates seed jobs and inserts them into gmaps_jobs table.
 // This bridges the Dashboard job (jobs_queue) to DSN workers (gmaps_jobs).
 func (s *JobService) bridgeToGmapsJobs(ctx context.Context, job *domain.Job) error {
-	// Build geo coordinates string
-	geoCoords := ""
-	if job.Config.GeoLat != nil && job.Config.GeoLon != nil {
-		geoCoords = runner.FormatGeoCoordinates(*job.Config.GeoLat, *job.Config.GeoLon)
-	}
+	var allSeedJobs []scrapemate.IJob
+	parentID := job.ID.String()
 
-	// Create seed jobs from keywords
-	seedJobs, err := runner.CreateSeedJobsFromKeywords(runner.SeedJobConfig{
-		Keywords:       job.Config.Keywords,
-		FastMode:       job.Config.FastMode,
-		LangCode:       job.Config.Lang,
-		Depth:          job.Config.Depth,
-		Email:          job.Config.ExtractEmail,
-		GeoCoordinates: geoCoords,
-		Zoom:           job.Config.Zoom,
-		Radius:         float64(job.Config.Radius),
-		ExtraReviews:   false, // Not exposed in Dashboard yet
-		Dedup:          nil,   // Deduplication handled by workers
-		ExitMonitor:    nil,   // Not needed for bridge
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create seed jobs: %w", err)
+	// Check if full coverage mode is enabled with valid bounding box
+	if job.Config.CoverageMode == domain.CoverageModeFull &&
+		job.Config.BoundingBox != nil &&
+		job.Config.BoundingBox.IsValid() {
+
+		// Generate grid points from bounding box based on radius
+		radius := job.Config.Radius
+		if radius < 100 {
+			radius = 5000 // default 5km
+		}
+		gridPoints := job.Config.BoundingBox.GenerateGridByRadius(radius)
+
+		log.Printf("[JobService] Full coverage mode enabled: generating %d grid points for job %s (radius: %dm)",
+			len(gridPoints), job.ID, radius)
+
+		// Create seed jobs for each grid point
+		for i, point := range gridPoints {
+			geoCoords := runner.FormatGeoCoordinates(point.Lat, point.Lon)
+
+			seedJobs, err := runner.CreateSeedJobsFromKeywords(runner.SeedJobConfig{
+				Keywords:       job.Config.Keywords,
+				FastMode:       job.Config.FastMode,
+				LangCode:       job.Config.Lang,
+				Depth:          job.Config.Depth,
+				Email:          job.Config.ExtractEmail,
+				GeoCoordinates: geoCoords,
+				Zoom:           job.Config.Zoom,
+				Radius:         float64(job.Config.Radius),
+				ExtraReviews:   false, // Not exposed in Dashboard yet
+				Dedup:          nil,   // Deduplication handled by workers
+				ExitMonitor:    nil,   // Not needed for bridge
+			})
+			if err != nil {
+				return fmt.Errorf("failed to create seed jobs for grid point %d (%.4f, %.4f): %w",
+					i, point.Lat, point.Lon, err)
+			}
+
+			allSeedJobs = append(allSeedJobs, seedJobs...)
+		}
+
+		log.Printf("[JobService] Full coverage mode: created %d total seed jobs for job %s",
+			len(allSeedJobs), job.ID)
+	} else {
+		// Single point mode (default/legacy behavior)
+		geoCoords := ""
+		if job.Config.GeoLat != nil && job.Config.GeoLon != nil {
+			geoCoords = runner.FormatGeoCoordinates(*job.Config.GeoLat, *job.Config.GeoLon)
+		}
+
+		seedJobs, err := runner.CreateSeedJobsFromKeywords(runner.SeedJobConfig{
+			Keywords:       job.Config.Keywords,
+			FastMode:       job.Config.FastMode,
+			LangCode:       job.Config.Lang,
+			Depth:          job.Config.Depth,
+			Email:          job.Config.ExtractEmail,
+			GeoCoordinates: geoCoords,
+			Zoom:           job.Config.Zoom,
+			Radius:         float64(job.Config.Radius),
+			ExtraReviews:   false, // Not exposed in Dashboard yet
+			Dedup:          nil,   // Deduplication handled by workers
+			ExitMonitor:    nil,   // Not needed for bridge
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create seed jobs: %w", err)
+		}
+
+		allSeedJobs = seedJobs
 	}
 
 	// Push each seed job to gmaps_jobs with parent reference
-	parentID := job.ID.String()
-	for _, seedJob := range seedJobs {
+	for _, seedJob := range allSeedJobs {
 		if err := s.gmapsPush.PushWithParent(ctx, seedJob, parentID); err != nil {
 			return fmt.Errorf("failed to push seed job %s: %w", seedJob.GetID(), err)
 		}
 	}
 
 	// Update job with total tasks count
-	job.Progress.TotalPlaces = len(seedJobs)
+	job.Progress.TotalPlaces = len(allSeedJobs)
 
 	return nil
 }
