@@ -104,6 +104,18 @@ export function JobForm({ cloneFrom, isRetry }: JobFormProps) {
             setValue("max_time", cloneFrom.config.max_time)
             if (cloneFrom.config.geo_lat) setValue("lat", String(cloneFrom.config.geo_lat))
             if (cloneFrom.config.geo_lon) setValue("lon", String(cloneFrom.config.geo_lon))
+            // Restore coverage mode and location data
+            if (cloneFrom.config.coverage_mode) {
+                setValue("coverage_mode", cloneFrom.config.coverage_mode)
+            }
+            if (cloneFrom.config.location_name && cloneFrom.config.boundingbox && cloneFrom.config.geo_lat && cloneFrom.config.geo_lon) {
+                setSelectedLocation({
+                    name: cloneFrom.config.location_name,
+                    lat: cloneFrom.config.geo_lat,
+                    lon: cloneFrom.config.geo_lon,
+                    boundingbox: cloneFrom.config.boundingbox
+                })
+            }
         }
     }, [cloneFrom, isRetry, setValue])
 
@@ -116,20 +128,29 @@ export function JobForm({ cloneFrom, isRetry }: JobFormProps) {
     const radius = values.radius
 
     // Calculate estimated grid points for full coverage mode
+    // Must match backend logic in domain/job.go GenerateGridByRadius
     const estimateGridPoints = (): number => {
         if (!selectedLocation?.boundingbox || coverageMode !== "full") return 1
 
         const bbox = selectedLocation.boundingbox
-        const latRange = bbox.max_lat - bbox.min_lat
-        const lonRange = bbox.max_lon - bbox.min_lon
+        const centerLat = (bbox.max_lat + bbox.min_lat) / 2
 
-        // Convert radius from meters to degrees (approximate)
-        const radiusInDegrees = radius / 111320
+        // Convert radius from meters to degrees (must match backend)
+        // 1 degree latitude ≈ 111320 meters
+        const latStep = radius / 111320
+        // Longitude varies with latitude (cosine correction)
+        const lonStep = radius / (111320 * Math.cos(centerLat * Math.PI / 180))
 
-        const rows = Math.max(1, Math.ceil(latRange / radiusInDegrees))
-        const cols = Math.max(1, Math.ceil(lonRange / radiusInDegrees))
+        // Count grid points (matching backend algorithm)
+        let count = 0
+        for (let lat = bbox.min_lat; lat <= bbox.max_lat; lat += latStep) {
+            for (let lon = bbox.min_lon; lon <= bbox.max_lon; lon += lonStep) {
+                count++
+            }
+        }
 
-        return rows * cols
+        // Cap at 100 points max (matching backend)
+        return Math.min(count, 100)
     }
 
     const gridPoints = estimateGridPoints()

@@ -230,6 +230,18 @@ func (h *JobHandler) Create(w http.ResponseWriter, r *http.Request) {
 		req.MaxTime = 600 // 10 minutes default
 	}
 
+	// Validate bounding box if full coverage mode is requested
+	if req.CoverageMode == domain.CoverageModeFull {
+		if req.BoundingBox == nil {
+			RenderError(w, http.StatusBadRequest, "Bounding box is required for full coverage mode")
+			return
+		}
+		if !req.BoundingBox.IsValid() {
+			RenderError(w, http.StatusBadRequest, "Invalid bounding box coordinates")
+			return
+		}
+	}
+
 	// Convert to domain request
 	domainReq := &domain.CreateJobRequest{
 		Name:         req.Name,

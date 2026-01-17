@@ -59,7 +59,7 @@ export function LocationSearch({ onLocationSelect, initialValue = "" }: Location
     const [loading, setLoading] = useState(false)
     const [selectedLocation, setSelectedLocation] = useState<NominatimResult | null>(null)
 
-    const debouncedInput = useDebounce(inputValue, 500)
+    const debouncedInput = useDebounce(inputValue, 1000) // 1 second debounce per Nominatim usage policy
 
     // Search Nominatim API
     const searchLocation = useCallback(async (query: string) => {
