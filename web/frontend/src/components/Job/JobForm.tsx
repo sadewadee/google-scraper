@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form"
 import { AxiosError } from "axios"
 import { toast } from "sonner"
 import { jobsApi } from "@/api/jobs"
-import type { JobCreatePayload, Job } from "@/api/types"
+import type { JobCreatePayload, Job, BoundingBox } from "@/api/types"
 import {
     TextField,
     Button,
@@ -20,9 +20,15 @@ import {
     CardHeader as MuiCardHeader,
     Alert,
     Stack,
-    Grid
+    Grid,
+    RadioGroup,
+    Radio,
+    FormLabel,
+    Typography,
+    Chip
 } from "@mui/material"
-import { Error as ErrorIcon, CheckCircle } from "@mui/icons-material"
+import { Error as ErrorIcon, CheckCircle, GridOn, MyLocation } from "@mui/icons-material"
+import { LocationSearch } from "./LocationSearch"
 
 interface FormData {
     name: string
@@ -37,6 +43,14 @@ interface FormData {
     extract_email: boolean
     priority: number
     max_time: number
+    coverage_mode: "single" | "full"
+}
+
+interface SelectedLocation {
+    name: string
+    lat: number
+    lon: number
+    boundingbox: BoundingBox
 }
 
 interface JobFormProps {
@@ -48,6 +62,7 @@ export function JobForm({ cloneFrom, isRetry }: JobFormProps) {
     const navigate = useNavigate()
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState(false)
+    const [selectedLocation, setSelectedLocation] = useState<SelectedLocation | null>(null)
 
     const {
         register,
@@ -64,12 +79,13 @@ export function JobForm({ cloneFrom, isRetry }: JobFormProps) {
             lat: "",
             lon: "",
             zoom: 15,
-            radius: 10000,
+            radius: 5000,
             depth: 10,
             fast_mode: false,
             extract_email: false,
             priority: 5,
             max_time: 600, // 10 minutes
+            coverage_mode: "single",
         },
     })
 
@@ -96,6 +112,36 @@ export function JobForm({ cloneFrom, isRetry }: JobFormProps) {
     const isExtractEmail = values.extract_email
     const lat = values.lat
     const lon = values.lon
+    const coverageMode = values.coverage_mode
+    const radius = values.radius
+
+    // Calculate estimated grid points for full coverage mode
+    const estimateGridPoints = (): number => {
+        if (!selectedLocation?.boundingbox || coverageMode !== "full") return 1
+
+        const bbox = selectedLocation.boundingbox
+        const latRange = bbox.max_lat - bbox.min_lat
+        const lonRange = bbox.max_lon - bbox.min_lon
+
+        // Convert radius from meters to degrees (approximate)
+        const radiusInDegrees = radius / 111320
+
+        const rows = Math.max(1, Math.ceil(latRange / radiusInDegrees))
+        const cols = Math.max(1, Math.ceil(lonRange / radiusInDegrees))
+
+        return rows * cols
+    }
+
+    const gridPoints = estimateGridPoints()
+    const keywordCount = values.keywords.split(/[,\n]/).filter(k => k.trim().length > 0).length
+    const totalSearches = gridPoints * Math.max(1, keywordCount)
+
+    // Handle location selection from LocationSearch
+    const handleLocationSelect = (location: SelectedLocation) => {
+        setSelectedLocation(location)
+        setValue("lat", String(location.lat))
+        setValue("lon", String(location.lon))
+    }
 
     // Check if form is ready for submission (especially for Fast Mode)
     const isReady = !isFastMode || (isFastMode && !!lat && !!lon)
@@ -147,12 +193,19 @@ export function JobForm({ cloneFrom, isRetry }: JobFormProps) {
                 extract_email: data.extract_email,
                 priority: data.priority,
                 max_time: data.max_time,
+                coverage_mode: data.coverage_mode,
             }
 
             // Add lat/lon if provided
             if (data.lat && data.lon) {
                 payload.lat = parseFloat(data.lat)
                 payload.lon = parseFloat(data.lon)
+            }
+
+            // Add location info if selected
+            if (selectedLocation) {
+                payload.location_name = selectedLocation.name
+                payload.boundingbox = selectedLocation.boundingbox
             }
 
             const response = await jobsApi.create(payload)
@@ -284,9 +337,80 @@ export function JobForm({ cloneFrom, isRetry }: JobFormProps) {
                                         slotProps={{ htmlInput: { min: 100, max: 50000 } }}
                                         fullWidth
                                         {...register("radius", { valueAsNumber: true })}
+                                        helperText={coverageMode === "full" ? "Also used as grid spacing" : ""}
                                     />
                                 </Grid>
                             </Grid>
+
+                            {/* Location Search */}
+                            <LocationSearch
+                                onLocationSelect={handleLocationSelect}
+                            />
+
+                            {/* Coverage Mode - show when location is selected */}
+                            {selectedLocation && (
+                                <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 2, border: '1px solid', borderColor: 'grey.200' }}>
+                                    <FormControl component="fieldset">
+                                        <FormLabel component="legend" sx={{ fontWeight: 600, mb: 1 }}>Coverage Mode</FormLabel>
+                                        <RadioGroup
+                                            row
+                                            value={coverageMode}
+                                            onChange={(e) => setValue("coverage_mode", e.target.value as "single" | "full")}
+                                        >
+                                            <FormControlLabel
+                                                value="single"
+                                                control={<Radio />}
+                                                label={
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                        <MyLocation sx={{ fontSize: 18 }} />
+                                                        <Typography variant="body2">Single Point (center only)</Typography>
+                                                    </Box>
+                                                }
+                                            />
+                                            <FormControlLabel
+                                                value="full"
+                                                control={<Radio />}
+                                                label={
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                        <GridOn sx={{ fontSize: 18 }} />
+                                                        <Typography variant="body2">Full Coverage (grid search)</Typography>
+                                                    </Box>
+                                                }
+                                            />
+                                        </RadioGroup>
+                                    </FormControl>
+
+                                    {coverageMode === "full" && (
+                                        <Box sx={{ mt: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                                            <Chip
+                                                label={`${gridPoints} grid points`}
+                                                color="primary"
+                                                variant="outlined"
+                                                size="small"
+                                            />
+                                            <Chip
+                                                label={`${keywordCount} keyword${keywordCount !== 1 ? 's' : ''}`}
+                                                color="secondary"
+                                                variant="outlined"
+                                                size="small"
+                                            />
+                                            <Chip
+                                                label={`${totalSearches} total searches`}
+                                                color="success"
+                                                variant="filled"
+                                                size="small"
+                                            />
+                                        </Box>
+                                    )}
+
+                                    {coverageMode === "full" && (
+                                        <Alert severity="info" sx={{ mt: 2 }}>
+                                            <strong>Full Coverage:</strong> The scraper will search from {gridPoints} points across the entire area.
+                                            This provides comprehensive results but takes longer.
+                                        </Alert>
+                                    )}
+                                </Box>
+                            )}
 
                             <Grid container spacing={2}>
                                 <Grid size={{ xs: 12, md: 6 }}>
@@ -296,8 +420,9 @@ export function JobForm({ cloneFrom, isRetry }: JobFormProps) {
                                         fullWidth
                                         required={isFastMode}
                                         error={isFastMode && (!lat || lat.length === 0)}
-                                        helperText={isFastMode && (!lat || lat.length === 0) ? "Required for Fast Mode" : ""}
+                                        helperText={isFastMode && (!lat || lat.length === 0) ? "Required for Fast Mode" : "Auto-filled from location search"}
                                         {...register("lat")}
+                                        slotProps={{ input: { readOnly: !!selectedLocation } }}
                                     />
                                 </Grid>
 
@@ -308,8 +433,9 @@ export function JobForm({ cloneFrom, isRetry }: JobFormProps) {
                                         fullWidth
                                         required={isFastMode}
                                         error={isFastMode && (!lon || lon.length === 0)}
-                                        helperText={isFastMode && (!lon || lon.length === 0) ? "Required for Fast Mode" : ""}
+                                        helperText={isFastMode && (!lon || lon.length === 0) ? "Required for Fast Mode" : "Auto-filled from location search"}
                                         {...register("lon")}
+                                        slotProps={{ input: { readOnly: !!selectedLocation } }}
                                     />
                                 </Grid>
                             </Grid>

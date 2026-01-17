@@ -178,6 +178,11 @@ type CreateJobRequest struct {
 	MaxTime      int      `json:"max_time"` // seconds
 	Proxies      []string `json:"proxies,omitempty"`
 	Priority     int      `json:"priority"`
+
+	// Geo coverage settings for area-wide scraping
+	LocationName string              `json:"location_name,omitempty"`
+	BoundingBox  *domain.BoundingBox `json:"boundingbox,omitempty"`
+	CoverageMode domain.CoverageMode `json:"coverage_mode,omitempty"`
 }
 
 // Create handles POST /api/v2/jobs
@@ -240,6 +245,10 @@ func (h *JobHandler) Create(w http.ResponseWriter, r *http.Request) {
 		MaxTime:      req.MaxTime,
 		Proxies:      req.Proxies,
 		Priority:     req.Priority,
+		// Geo coverage settings for area-wide scraping
+		LocationName: req.LocationName,
+		BoundingBox:  req.BoundingBox,
+		CoverageMode: req.CoverageMode,
 	}
 
 	log.Printf("[JobHandler] Calling service.Create")
