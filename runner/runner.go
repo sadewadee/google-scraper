@@ -103,7 +103,7 @@ type Config struct {
 	ProxyGateSources         []string
 	ProxyGateRefreshInterval time.Duration
 
-	// Email validation (Moribouncer)
+	// Email validation (Mordibouncer)
 	EmailValidatorURL string
 	EmailValidatorKey string
 
@@ -121,6 +121,7 @@ type Config struct {
 	SpawnerLabels      map[string]string // Labels for spawned containers
 	SpawnerConstraints []string          // Swarm placement constraints
 	SpawnerManagerURL  string            // Manager URL for spawned workers (default: auto-detect)
+	SpawnerProxies     string            // Proxy URL for spawned workers (e.g., socks5://manager:8081)
 
 	// AWS Lambda spawner configuration
 	SpawnerLambdaFunction   string // Lambda function name/ARN
@@ -195,9 +196,9 @@ func ParseConfig() *Config {
 	flag.StringVar(&proxyGateSources, "proxygate-sources", "", "comma-separated proxy source URLs (uses defaults if empty)")
 	flag.DurationVar(&cfg.ProxyGateRefreshInterval, "proxygate-refresh", 10*time.Minute, "proxy refresh interval")
 
-	// Email validation flags
-	flag.StringVar(&cfg.EmailValidatorURL, "email-validator-url", "", "Email validation API URL (e.g., https://api.moribouncer.com/v1)")
-	flag.StringVar(&cfg.EmailValidatorKey, "email-validator-key", "", "Email validation API key (Moribouncer)")
+	// Email validation flags (Mordibouncer)
+	flag.StringVar(&cfg.EmailValidatorURL, "email-validator-url", "", "Mordibouncer API URL (default: https://mailexchange.kremlit.dev)")
+	flag.StringVar(&cfg.EmailValidatorKey, "email-validator-key", "", "Mordibouncer API key (x-mordibouncer-secret header)")
 
 	// Migration flags
 	flag.BoolVar(&cfg.Migrate, "migrate", false, "Run auto-migration and exit")
@@ -211,6 +212,7 @@ func ParseConfig() *Config {
 	flag.IntVar(&cfg.SpawnerMaxWorkers, "spawner-max-workers", 0, "Max concurrent workers (0 = unlimited)")
 	flag.BoolVar(&cfg.SpawnerAutoRemove, "spawner-auto-remove", true, "Auto-remove containers after exit")
 	flag.StringVar(&cfg.SpawnerManagerURL, "spawner-manager-url", "", "Manager URL for spawned workers (e.g., http://manager:8080)")
+	flag.StringVar(&cfg.SpawnerProxies, "spawner-proxies", "", "Proxy URL for spawned workers (e.g., socks5://manager:8081)")
 	flag.StringVar(&cfg.SpawnerLambdaFunction, "spawner-lambda-function", "", "AWS Lambda function name/ARN")
 	flag.StringVar(&cfg.SpawnerLambdaRegion, "spawner-lambda-region", "", "AWS region for Lambda (defaults to -aws-region)")
 	flag.StringVar(&cfg.SpawnerLambdaInvocation, "spawner-lambda-invocation", "Event", "Lambda invocation type: Event (async) or RequestResponse (sync)")
@@ -230,9 +232,12 @@ func ParseConfig() *Config {
 		cfg.AwsRegion = os.Getenv("MY_AWS_REGION")
 	}
 
-	// Email validator environment variable fallback
+	// Mordibouncer email validator environment variable fallback
 	if cfg.EmailValidatorKey == "" {
-		cfg.EmailValidatorKey = os.Getenv("MORIBOUNCER_API_KEY")
+		cfg.EmailValidatorKey = os.Getenv("MORDIBOUNCER_API_KEY")
+	}
+	if cfg.EmailValidatorURL == "" {
+		cfg.EmailValidatorURL = os.Getenv("MORDIBOUNCER_API_URL")
 	}
 
 	if cfg.AwsLambdaInvoker && cfg.FunctionName == "" {

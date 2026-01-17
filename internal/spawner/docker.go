@@ -19,6 +19,7 @@ type DockerSpawner struct {
 	managerURL  string
 	rabbitmqURL string
 	redisAddr   string
+	proxies     string // Proxy URL for workers (e.g., "socks5://host:port")
 
 	// Track active containers
 	mu         sync.Mutex
@@ -26,7 +27,7 @@ type DockerSpawner struct {
 }
 
 // NewDockerSpawner creates a new Docker spawner
-func NewDockerSpawner(cfg *DockerConfig, managerURL, rabbitmqURL, redisAddr string) (*DockerSpawner, error) {
+func NewDockerSpawner(cfg *DockerConfig, managerURL, rabbitmqURL, redisAddr, proxies string) (*DockerSpawner, error) {
 	// Set defaults
 	if cfg.Image == "" {
 		cfg.Image = "gmaps-scraper:latest"
@@ -61,6 +62,7 @@ func NewDockerSpawner(cfg *DockerConfig, managerURL, rabbitmqURL, redisAddr stri
 		managerURL:  managerURL,
 		rabbitmqURL: rabbitmqURL,
 		redisAddr:   redisAddr,
+		proxies:     proxies,
 		containers:  make(map[string]time.Time),
 	}, nil
 }
@@ -102,6 +104,9 @@ func (s *DockerSpawner) Spawn(ctx context.Context, req *SpawnRequest) (*SpawnRes
 	}
 	if s.redisAddr != "" {
 		cmd = append(cmd, "-redis-addr", s.redisAddr)
+	}
+	if s.proxies != "" {
+		cmd = append(cmd, "-proxies", s.proxies)
 	}
 
 	// Add extra args

@@ -156,6 +156,7 @@ services:
       - "-spawner-concurrency=${SPAWNER_CONCURRENCY:-4}"
       - "-spawner-max-workers=${SPAWNER_MAX_WORKERS:-5}"
       - "-spawner-auto-remove=true"
+      - "-spawner-proxies=${PROXY_URL:-socks5://manager:8081}"
     ports:
       - "${WEB_PORT:-8080}:8080"
     environment:
@@ -163,6 +164,9 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-gmaps_secret}
       - POSTGRES_DB=${POSTGRES_DB:-gmaps}
       - API_TOKEN=${API_TOKEN}
+      # Mordibouncer email validation
+      - MORDIBOUNCER_API_KEY=${MORDIBOUNCER_API_KEY}
+      - MORDIBOUNCER_API_URL=${MORDIBOUNCER_API_URL:-https://mailexchange.kremlit.dev}
       # Spawner configuration (can be customized via .env)
       - SPAWNER_IMAGE=${SPAWNER_IMAGE:-gmaps-scraper-rod:latest}
       - SPAWNER_MAX_WORKERS=${SPAWNER_MAX_WORKERS:-5}
@@ -209,11 +213,14 @@ services:
       - "-redis-addr=redis:6379"
       - "-rabbitmq-url=amqp://${RABBITMQ_USER:-gmaps}:${RABBITMQ_PASSWORD:-gmaps_secret}@rabbitmq:5672/"
       - "-c=${CONCURRENCY:-4}"
-      - "-proxies=socks5://31.211.142.115:8192"
+      - "-proxies=${PROXY_URL:-socks5://manager:8081}"
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-gmaps}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-gmaps_secret}
       - API_TOKEN=${API_TOKEN}
+      # Mordibouncer email validation
+      - MORDIBOUNCER_API_KEY=${MORDIBOUNCER_API_KEY}
+      - MORDIBOUNCER_API_URL=${MORDIBOUNCER_API_URL:-https://mailexchange.kremlit.dev}
     volumes:
       - worker_data:/data
       - ./results:/results

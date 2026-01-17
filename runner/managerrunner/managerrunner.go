@@ -69,6 +69,7 @@ type Config struct {
 	SpawnerLabels      map[string]string // Labels for spawned containers
 	SpawnerConstraints []string          // Swarm placement constraints
 	SpawnerManagerURL  string            // Manager URL for spawned workers (Dokploy: use service name)
+	SpawnerProxies     string            // Proxy URL for spawned workers (e.g., socks5://manager:8081)
 
 	// AWS Lambda spawner configuration
 	SpawnerLambdaFunction   string // Lambda function name/ARN
@@ -303,6 +304,7 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 			ManagerURL:  managerURL,
 			RabbitMQURL: cfg.RabbitMQURL,
 			RedisAddr:   cfg.RedisAddr,
+			Proxies:     cfg.SpawnerProxies,
 			Docker: spawner.DockerConfig{
 				Image:       cfg.SpawnerImage,
 				Network:     cfg.SpawnerNetwork,

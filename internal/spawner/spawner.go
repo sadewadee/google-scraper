@@ -95,6 +95,9 @@ type Config struct {
 	// RedisAddr is the Redis address
 	RedisAddr string
 
+	// Proxies is the proxy URL for workers (e.g., "socks5://host:port")
+	Proxies string
+
 	// Docker-specific configuration
 	Docker DockerConfig
 
@@ -174,7 +177,7 @@ func New(cfg *Config) (Spawner, error) {
 	case SpawnerTypeNone, "":
 		return NewNoOpSpawner(), nil
 	case SpawnerTypeDocker:
-		return NewDockerSpawner(&cfg.Docker, cfg.ManagerURL, cfg.RabbitMQURL, cfg.RedisAddr)
+		return NewDockerSpawner(&cfg.Docker, cfg.ManagerURL, cfg.RabbitMQURL, cfg.RedisAddr, cfg.Proxies)
 	case SpawnerTypeSwarm:
 		return NewSwarmSpawner(&cfg.Swarm, cfg.ManagerURL, cfg.RabbitMQURL, cfg.RedisAddr)
 	case SpawnerTypeLambda:
