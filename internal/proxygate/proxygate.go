@@ -68,3 +68,9 @@ func (pg *ProxyGate) RemoveSource(url string) {
 func (pg *ProxyGate) SetPoolRepo(repo domain.ProxyListRepository) {
 	pg.pool.SetRepo(repo)
 }
+
+// LoadFromDatabase loads healthy proxies from database into the in-memory pool
+// This should be called after SetPoolRepo to initialize the pool with existing proxies
+func (pg *ProxyGate) LoadFromDatabase(ctx context.Context) error {
+	return pg.pool.LoadFromDatabase(ctx)
+}

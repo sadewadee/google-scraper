@@ -345,3 +345,170 @@ func (h *ProxyHandler) DeleteDeadProxies(w http.ResponseWriter, r *http.Request)
 		"count":   count,
 	})
 }
+
+// AddProxy adds a single proxy to the database
+func (h *ProxyHandler) AddProxy(w http.ResponseWriter, r *http.Request) {
+	if h.proxyListRepo == nil {
+		RenderError(w, http.StatusServiceUnavailable, "Proxy list repository not configured")
+		return
+	}
+
+	var req struct {
+		IP       string `json:"ip"`
+		Port     int    `json:"port"`
+		Protocol string `json:"protocol"`
+		Country  string `json:"country,omitempty"`
+		Status   string `json:"status,omitempty"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		RenderError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.IP == "" || req.Port == 0 {
+		RenderError(w, http.StatusBadRequest, "IP and port are required")
+		return
+	}
+
+	if req.Protocol == "" {
+		req.Protocol = "socks5"
+	}
+
+	status := domain.ProxyStatusHealthy
+	if req.Status != "" {
+		status = domain.ProxyStatus(req.Status)
+	}
+
+	proxy := &domain.Proxy{
+		IP:       req.IP,
+		Port:     req.Port,
+		Protocol: req.Protocol,
+		Country:  req.Country,
+		Status:   status,
+	}
+
+	if err := h.proxyListRepo.Upsert(r.Context(), proxy); err != nil {
+		log.Printf("Failed to add proxy: %v", err)
+		RenderError(w, http.StatusInternalServerError, "Failed to add proxy")
+		return
+	}
+
+	RenderJSON(w, http.StatusCreated, map[string]interface{}{
+		"id":       proxy.ID,
+		"ip":       proxy.IP,
+		"port":     proxy.Port,
+		"protocol": proxy.Protocol,
+		"status":   proxy.Status,
+	})
+}
+
+// AddProxiesBulk adds multiple proxies to the database
+func (h *ProxyHandler) AddProxiesBulk(w http.ResponseWriter, r *http.Request) {
+	if h.proxyListRepo == nil {
+		RenderError(w, http.StatusServiceUnavailable, "Proxy list repository not configured")
+		return
+	}
+
+	var req struct {
+		Proxies []struct {
+			IP       string `json:"ip"`
+			Port     int    `json:"port"`
+			Protocol string `json:"protocol,omitempty"`
+			Country  string `json:"country,omitempty"`
+		} `json:"proxies"`
+		Status string `json:"status,omitempty"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		RenderError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if len(req.Proxies) == 0 {
+		RenderError(w, http.StatusBadRequest, "Proxies array is required")
+		return
+	}
+
+	status := domain.ProxyStatusHealthy
+	if req.Status != "" {
+		status = domain.ProxyStatus(req.Status)
+	}
+
+	var proxies []*domain.Proxy
+	for _, p := range req.Proxies {
+		if p.IP == "" || p.Port == 0 {
+			continue
+		}
+		protocol := p.Protocol
+		if protocol == "" {
+			protocol = "socks5"
+		}
+		proxies = append(proxies, &domain.Proxy{
+			IP:       p.IP,
+			Port:     p.Port,
+			Protocol: protocol,
+			Country:  p.Country,
+			Status:   status,
+		})
+	}
+
+	if len(proxies) == 0 {
+		RenderError(w, http.StatusBadRequest, "No valid proxies provided")
+		return
+	}
+
+	if err := h.proxyListRepo.UpsertBatch(r.Context(), proxies); err != nil {
+		log.Printf("Failed to add proxies: %v", err)
+		RenderError(w, http.StatusInternalServerError, "Failed to add proxies")
+		return
+	}
+
+	RenderJSON(w, http.StatusCreated, map[string]interface{}{
+		"message": "Proxies added",
+		"count":   len(proxies),
+	})
+}
+
+// UpdateProxyStatus updates the status of a proxy
+func (h *ProxyHandler) UpdateProxyStatus(w http.ResponseWriter, r *http.Request) {
+	if h.proxyListRepo == nil {
+		RenderError(w, http.StatusServiceUnavailable, "Proxy list repository not configured")
+		return
+	}
+
+	idStr := r.PathValue("id")
+	if idStr == "" {
+		RenderError(w, http.StatusBadRequest, "ID is required")
+		return
+	}
+
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		RenderError(w, http.StatusBadRequest, "Invalid ID format")
+		return
+	}
+
+	var req struct {
+		Status string `json:"status"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		RenderError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.Status == "" {
+		RenderError(w, http.StatusBadRequest, "Status is required")
+		return
+	}
+
+	// Update status via repository
+	if err := h.proxyListRepo.UpdateStatus(r.Context(), id, domain.ProxyStatus(req.Status)); err != nil {
+		log.Printf("Failed to update proxy status: %v", err)
+		RenderError(w, http.StatusInternalServerError, "Failed to update proxy status")
+		return
+	}
+
+	RenderJSON(w, http.StatusOK, map[string]string{"message": "Status updated"})
+}

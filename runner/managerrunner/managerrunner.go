@@ -395,6 +395,12 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 		if pg != nil {
 			pg.SetPoolRepo(proxyListRepo)
 			log.Println("manager: ProxyGate pool connected to database for persistence")
+
+			// Load existing healthy proxies from database into memory pool
+			ctx := context.Background()
+			if err := pg.LoadFromDatabase(ctx); err != nil {
+				log.Printf("manager: failed to load proxies from database: %v", err)
+			}
 		}
 		log.Println("manager: ProxyListRepository initialized for proxy list access")
 	}

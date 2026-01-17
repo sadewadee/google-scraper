@@ -73,8 +73,10 @@ func (r *Router) Setup(token string) http.Handler {
 	r.mux.HandleFunc("/api/v2/proxygate/sources", r.handleProxySources)
 	r.mux.HandleFunc("/api/v2/proxygate/sources/{id}", r.handleProxySource)
 	r.mux.HandleFunc("/api/v2/proxygate/refresh", r.proxy.Refresh)
-	r.mux.HandleFunc("/api/v2/proxygate/proxies", r.proxy.ListProxies)
+	r.mux.HandleFunc("/api/v2/proxygate/proxies", r.handleProxies)
+	r.mux.HandleFunc("/api/v2/proxygate/proxies/bulk", r.proxy.AddProxiesBulk)
 	r.mux.HandleFunc("/api/v2/proxygate/proxies/cleanup", r.proxy.DeleteDeadProxies)
+	r.mux.HandleFunc("/api/v2/proxygate/proxies/{id}", r.handleProxy)
 
 	// Job endpoints
 	r.mux.HandleFunc("/api/v2/jobs", r.handleJobs)
@@ -201,6 +203,28 @@ func (r *Router) handleProxySource(w http.ResponseWriter, req *http.Request) {
 		r.proxy.DeleteSource(w, req)
 	case http.MethodPatch:
 		r.proxy.UpdateSource(w, req)
+	default:
+		handlers.RenderError(w, http.StatusMethodNotAllowed, "Method not allowed")
+	}
+}
+
+// handleProxies routes requests for /api/v2/proxygate/proxies
+func (r *Router) handleProxies(w http.ResponseWriter, req *http.Request) {
+	switch req.Method {
+	case http.MethodGet:
+		r.proxy.ListProxies(w, req)
+	case http.MethodPost:
+		r.proxy.AddProxy(w, req)
+	default:
+		handlers.RenderError(w, http.StatusMethodNotAllowed, "Method not allowed")
+	}
+}
+
+// handleProxy routes requests for /api/v2/proxygate/proxies/{id}
+func (r *Router) handleProxy(w http.ResponseWriter, req *http.Request) {
+	switch req.Method {
+	case http.MethodPatch:
+		r.proxy.UpdateProxyStatus(w, req)
 	default:
 		handlers.RenderError(w, http.StatusMethodNotAllowed, "Method not allowed")
 	}
