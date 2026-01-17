@@ -92,7 +92,12 @@ func (p *Pool) GetNext() (string, error) {
 		}(proxy.ID)
 	}
 
-	return fmt.Sprintf("%s:%d", proxy.IP, proxy.Port), nil
+	// Return full URL with protocol scheme (e.g., socks5://192.168.1.1:1080)
+	protocol := proxy.Protocol
+	if protocol == "" {
+		protocol = "socks5"
+	}
+	return fmt.Sprintf("%s://%s:%d", protocol, proxy.IP, proxy.Port), nil
 }
 
 // GetNextWithID returns the next proxy with its database ID
