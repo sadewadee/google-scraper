@@ -106,17 +106,30 @@ export function LocationSearch({ onLocationSelect, initialValue = "" }: Location
         setSelectedLocation(value)
 
         if (value) {
+            const lat = parseFloat(value.lat)
+            const lon = parseFloat(value.lon)
+            const minLat = parseFloat(value.boundingbox[0])
+            const maxLat = parseFloat(value.boundingbox[1])
+            const minLon = parseFloat(value.boundingbox[2])
+            const maxLon = parseFloat(value.boundingbox[3])
+
+            // Validate parsed values
+            if (isNaN(lat) || isNaN(lon) || isNaN(minLat) || isNaN(maxLat) || isNaN(minLon) || isNaN(maxLon)) {
+                console.error("Invalid coordinates from Nominatim:", value)
+                return
+            }
+
             const boundingbox: BoundingBox = {
-                min_lat: parseFloat(value.boundingbox[0]),
-                max_lat: parseFloat(value.boundingbox[1]),
-                min_lon: parseFloat(value.boundingbox[2]),
-                max_lon: parseFloat(value.boundingbox[3])
+                min_lat: minLat,
+                max_lat: maxLat,
+                min_lon: minLon,
+                max_lon: maxLon
             }
 
             onLocationSelect({
                 name: value.display_name,
-                lat: parseFloat(value.lat),
-                lon: parseFloat(value.lon),
+                lat,
+                lon,
                 boundingbox
             })
         }
@@ -156,11 +169,30 @@ export function LocationSearch({ onLocationSelect, initialValue = "" }: Location
             filterOptions={(x) => x} // Don't filter, use API results directly
             renderOption={(props, option) => {
                 const { key, ...rest } = props
+                const minLat = parseFloat(option.boundingbox[0])
+                const maxLat = parseFloat(option.boundingbox[1])
+                const minLon = parseFloat(option.boundingbox[2])
+                const maxLon = parseFloat(option.boundingbox[3])
+
+                // Skip invalid bounding boxes
+                if (isNaN(minLat) || isNaN(maxLat) || isNaN(minLon) || isNaN(maxLon)) {
+                    return (
+                        <Box component="li" key={key} {...rest} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start !important', py: 1.5 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <LocationOn sx={{ fontSize: 18, color: 'text.secondary' }} />
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {option.display_name}
+                                </Typography>
+                            </Box>
+                        </Box>
+                    )
+                }
+
                 const bbox: BoundingBox = {
-                    min_lat: parseFloat(option.boundingbox[0]),
-                    max_lat: parseFloat(option.boundingbox[1]),
-                    min_lon: parseFloat(option.boundingbox[2]),
-                    max_lon: parseFloat(option.boundingbox[3])
+                    min_lat: minLat,
+                    max_lat: maxLat,
+                    min_lon: minLon,
+                    max_lon: maxLon
                 }
 
                 return (

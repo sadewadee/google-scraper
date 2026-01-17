@@ -18,6 +18,7 @@ export interface Job {
         location_name?: string
         boundingbox?: BoundingBox
         coverage_mode?: "single" | "full"
+        grid_points?: number
     }
     progress: {
         total_places: number

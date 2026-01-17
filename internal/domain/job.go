@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"math"
 	"time"
 
 	"github.com/google/uuid"
@@ -40,6 +41,10 @@ func (b *BoundingBox) IsValid() bool {
 	}
 	// Max must be greater than Min for latitude
 	if b.MaxLat <= b.MinLat {
+		return false
+	}
+	// Max must be greater than Min for longitude (cross-dateline not supported)
+	if b.MaxLon <= b.MinLon {
 		return false
 	}
 	return true
@@ -98,7 +103,7 @@ func (b *BoundingBox) GenerateGridByRadius(radiusMeters int) []GridPoint {
 
 	// Longitude varies with latitude, use center latitude for approximation
 	centerLat := (b.MaxLat + b.MinLat) / 2
-	lonStep := float64(radiusMeters) / (111320.0 * cos(centerLat))
+	lonStep := float64(radiusMeters) / (111320.0 * math.Cos(centerLat*math.Pi/180.0))
 
 	points := make([]GridPoint, 0)
 
@@ -115,32 +120,6 @@ func (b *BoundingBox) GenerateGridByRadius(radiusMeters int) []GridPoint {
 	}
 
 	return points
-}
-
-// cos returns the cosine of x (in degrees)
-func cos(degrees float64) float64 {
-	return cosRad(degrees * 3.14159265358979323846 / 180.0)
-}
-
-// cosRad returns the cosine of x (in radians) using Taylor series
-func cosRad(x float64) float64 {
-	// Normalize x to [-pi, pi]
-	for x > 3.14159265358979323846 {
-		x -= 2 * 3.14159265358979323846
-	}
-	for x < -3.14159265358979323846 {
-		x += 2 * 3.14159265358979323846
-	}
-
-	// Taylor series: cos(x) = 1 - x²/2! + x⁴/4! - x⁶/6! + ...
-	result := 1.0
-	term := 1.0
-	x2 := x * x
-	for i := 1; i <= 10; i++ {
-		term *= -x2 / float64((2*i-1)*(2*i))
-		result += term
-	}
-	return result
 }
 
 // JobStatus represents the status of a job
