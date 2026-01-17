@@ -384,6 +384,19 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 		log.Println("manager: BusinessListingHandler initialized for normalized data access")
 	}
 
+	// Create ProxyListRepository for listing individual proxies (PostgreSQL only)
+	var proxyListRepo domain.ProxyListRepository
+	if isPostgres {
+		proxyListRepo = postgres.NewProxyListRepository(db)
+		proxyHandler.SetProxyListRepo(proxyListRepo)
+		// Also set pool repo for ProxyGate to persist fetched proxies
+		if pg != nil {
+			pg.SetPoolRepo(proxyListRepo)
+			log.Println("manager: ProxyGate pool connected to database for persistence")
+		}
+		log.Println("manager: ProxyListRepository initialized for proxy list access")
+	}
+
 	// Load sources if proxyRepo is available
 	if proxyRepo != nil && pg != nil {
 		ctx := context.Background()

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -39,8 +40,13 @@ func (v *Validator) worker(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		case rawProxy := <-v.pool.raw:
-			if v.validate(ctx, rawProxy) {
-				v.pool.AddValidated(rawProxy)
+			// Construct proper URL if no scheme present (raw format: IP:PORT)
+			proxyURL := rawProxy
+			if !strings.Contains(rawProxy, "://") {
+				proxyURL = "socks5://" + rawProxy
+			}
+			if v.validate(ctx, proxyURL) {
+				v.pool.AddValidated(rawProxy) // Store original format
 			}
 		}
 	}

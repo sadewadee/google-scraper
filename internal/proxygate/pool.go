@@ -43,6 +43,13 @@ func NewPoolWithRepo(repo domain.ProxyListRepository) *Pool {
 	}
 }
 
+// SetRepo sets the database repository for persistence (can be called after construction)
+func (p *Pool) SetRepo(repo domain.ProxyListRepository) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.repo = repo
+}
+
 // LoadFromDatabase loads healthy proxies from database into memory
 func (p *Pool) LoadFromDatabase(ctx context.Context) error {
 	if p.repo == nil {
@@ -85,7 +92,12 @@ func (p *Pool) GetNext() (string, error) {
 		}(proxy.ID)
 	}
 
-	return fmt.Sprintf("%s:%d", proxy.IP, proxy.Port), nil
+	// Return full URL with protocol scheme (e.g., socks5://192.168.1.1:1080)
+	protocol := proxy.Protocol
+	if protocol == "" {
+		protocol = "socks5"
+	}
+	return fmt.Sprintf("%s://%s:%d", protocol, proxy.IP, proxy.Port), nil
 }
 
 // GetNextWithID returns the next proxy with its database ID
