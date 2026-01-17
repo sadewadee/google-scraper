@@ -43,6 +43,13 @@ func NewPoolWithRepo(repo domain.ProxyListRepository) *Pool {
 	}
 }
 
+// SetRepo sets the database repository for persistence (can be called after construction)
+func (p *Pool) SetRepo(repo domain.ProxyListRepository) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.repo = repo
+}
+
 // LoadFromDatabase loads healthy proxies from database into memory
 func (p *Pool) LoadFromDatabase(ctx context.Context) error {
 	if p.repo == nil {

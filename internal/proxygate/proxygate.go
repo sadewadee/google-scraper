@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/sadewadee/google-scraper/internal/domain"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -60,4 +61,10 @@ func (pg *ProxyGate) AddSource(url string) {
 
 func (pg *ProxyGate) RemoveSource(url string) {
 	pg.fetcher.RemoveSource(url)
+}
+
+// SetPoolRepo sets the database repository for proxy persistence
+// This can be called after construction when database becomes available
+func (pg *ProxyGate) SetPoolRepo(repo domain.ProxyListRepository) {
+	pg.pool.SetRepo(repo)
 }
