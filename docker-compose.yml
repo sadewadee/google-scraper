@@ -209,7 +209,7 @@ services:
       - "-redis-addr=redis:6379"
       - "-rabbitmq-url=amqp://${RABBITMQ_USER:-gmaps}:${RABBITMQ_PASSWORD:-gmaps_secret}@rabbitmq:5672/"
       - "-c=${CONCURRENCY:-4}"
-      - "-proxies=socks5://manager:8081"
+      - "-proxies=socks5://31.211.142.115:8192"
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-gmaps}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-gmaps_secret}
