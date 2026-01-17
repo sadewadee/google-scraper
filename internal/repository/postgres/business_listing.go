@@ -230,7 +230,7 @@ func baseSelectQuery() string {
 	return `
 		SELECT
 			bl.id, bl.result_id, bl.job_id, bl.place_id, bl.cid,
-			bl.title, bl.category, bl.categories, bl.address, bl.phone,
+			bl.title, bl.category, COALESCE(array_to_json(bl.categories), '[]'::json) AS categories, bl.address, bl.phone,
 			bl.website, bl.latitude, bl.longitude, bl.address_city, bl.address_country,
 			bl.review_count, bl.review_rating, bl.status, bl.price_range, bl.link,
 			bl.created_at,
@@ -245,7 +245,7 @@ func baseSelectQuery() string {
 				) FILTER (WHERE e.id IS NOT NULL),
 				'[]'::jsonb
 			) AS emails_info,
-			COALESCE(array_agg(DISTINCT e.email) FILTER (WHERE e.id IS NOT NULL), ARRAY[]::TEXT[]) AS emails,
+			COALESCE(array_to_json(array_agg(DISTINCT e.email) FILTER (WHERE e.id IS NOT NULL)), '[]'::json) AS emails,
 			COUNT(DISTINCT e.id) FILTER (WHERE e.is_acceptable = true) AS valid_email_count,
 			COUNT(DISTINCT e.id) AS total_email_count
 		FROM business_listings bl

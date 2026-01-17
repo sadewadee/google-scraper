@@ -136,6 +136,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.rod
+    image: ${SPAWNER_IMAGE:-gmaps-scraper-rod:latest}
     container_name: gmaps-manager
     command:
       - "-manager"
@@ -201,6 +202,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.rod
+    image: ${SPAWNER_IMAGE:-gmaps-scraper-rod:latest}
     command:
       - "-worker"
       - "-manager-url=http://manager:8080"
