@@ -102,37 +102,41 @@ export function LocationSearch({ onLocationSelect, initialValue = "" }: Location
         }
     }, [debouncedInput, searchLocation, selectedLocation])
 
-    const handleSelect = (_event: React.SyntheticEvent, value: NominatimResult | null) => {
+    const handleSelect = (_event: React.SyntheticEvent, value: string | NominatimResult | null) => {
+        // With freeSolo, value can be a string (user typed) or NominatimResult (selected from list)
+        if (typeof value === 'string' || value === null) {
+            setSelectedLocation(null)
+            return
+        }
+
         setSelectedLocation(value)
 
-        if (value) {
-            const lat = parseFloat(value.lat)
-            const lon = parseFloat(value.lon)
-            const minLat = parseFloat(value.boundingbox[0])
-            const maxLat = parseFloat(value.boundingbox[1])
-            const minLon = parseFloat(value.boundingbox[2])
-            const maxLon = parseFloat(value.boundingbox[3])
+        const lat = parseFloat(value.lat)
+        const lon = parseFloat(value.lon)
+        const minLat = parseFloat(value.boundingbox[0])
+        const maxLat = parseFloat(value.boundingbox[1])
+        const minLon = parseFloat(value.boundingbox[2])
+        const maxLon = parseFloat(value.boundingbox[3])
 
-            // Validate parsed values
-            if (isNaN(lat) || isNaN(lon) || isNaN(minLat) || isNaN(maxLat) || isNaN(minLon) || isNaN(maxLon)) {
-                console.error("Invalid coordinates from Nominatim:", value)
-                return
-            }
-
-            const boundingbox: BoundingBox = {
-                min_lat: minLat,
-                max_lat: maxLat,
-                min_lon: minLon,
-                max_lon: maxLon
-            }
-
-            onLocationSelect({
-                name: value.display_name,
-                lat,
-                lon,
-                boundingbox
-            })
+        // Validate parsed values
+        if (isNaN(lat) || isNaN(lon) || isNaN(minLat) || isNaN(maxLat) || isNaN(minLon) || isNaN(maxLon)) {
+            console.error("Invalid coordinates from Nominatim:", value)
+            return
         }
+
+        const boundingbox: BoundingBox = {
+            min_lat: minLat,
+            max_lat: maxLat,
+            min_lon: minLon,
+            max_lon: maxLon
+        }
+
+        onLocationSelect({
+            name: value.display_name,
+            lat,
+            lon,
+            boundingbox
+        })
     }
 
     // Calculate area size for display
