@@ -163,8 +163,8 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 		resultRepo = repos.Results
 		proxyRepo = repos.Proxies
 
-		// Initialize BusinessListingRepository for normalized data access
-		businessListingRepo = postgres.NewBusinessListingRepository(db)
+		// Note: BusinessListingRepository is initialized later after Redis cache is ready
+		// to enable caching for expensive COUNT queries
 	} else {
 		// Default to SQLite
 		if cfg.DatabaseURL == "" {
@@ -239,6 +239,23 @@ func New(cfg *Config, pg *proxygate.ProxyGate) (runner.Runner, error) {
 		log.Println("manager: no Redis configured, workers will use HTTP polling")
 		log.Println("manager: no Redis configured, using no-op cache (slower dashboard)")
 		redisCache = cache.NewNoOpCache()
+	}
+
+	// Initialize BusinessListingRepository with caching (PostgreSQL only)
+	// This is done after Redis cache is ready to enable caching for expensive COUNT queries
+	if isPostgres {
+		cachedRepo := postgres.NewCachedBusinessListingRepository(db, redisCache)
+		businessListingRepo = cachedRepo
+		log.Println("manager: BusinessListingRepository initialized with caching support")
+
+		// Preload cache in background to avoid 504 on first request
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			defer cancel()
+			if err := cachedRepo.PreloadCache(ctx); err != nil {
+				log.Printf("manager: cache preload failed: %v", err)
+			}
+		}()
 	}
 
 	// Initialize RabbitMQ publisher (optional)
