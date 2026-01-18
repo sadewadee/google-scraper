@@ -50,6 +50,13 @@ func (p *Pool) SetRepo(repo domain.ProxyListRepository) {
 	p.repo = repo
 }
 
+// HasRepo returns true if a database repository is configured
+func (p *Pool) HasRepo() bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.repo != nil
+}
+
 // LoadFromDatabase loads healthy proxies from database into memory
 func (p *Pool) LoadFromDatabase(ctx context.Context) error {
 	if p.repo == nil {

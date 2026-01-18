@@ -394,6 +394,12 @@ func (h *ProxyHandler) AddProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// If status is healthy, also add to in-memory pool for immediate availability
+	if status == domain.ProxyStatusHealthy && h.pg != nil {
+		h.pg.AddProxyToPool(proxy)
+		log.Printf("[ProxyHandler] Added proxy %s:%d to memory pool (total: %d)", proxy.IP, proxy.Port, h.pg.PoolSize())
+	}
+
 	RenderJSON(w, http.StatusCreated, map[string]interface{}{
 		"id":       proxy.ID,
 		"ip":       proxy.IP,
@@ -462,6 +468,15 @@ func (h *ProxyHandler) AddProxiesBulk(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Failed to add proxies: %v", err)
 		RenderError(w, http.StatusInternalServerError, "Failed to add proxies")
 		return
+	}
+
+	// If status is healthy, reload pool from database to include new proxies
+	if status == domain.ProxyStatusHealthy && h.pg != nil {
+		if err := h.pg.ReloadFromDatabase(r.Context()); err != nil {
+			log.Printf("[ProxyHandler] Failed to reload pool after bulk add: %v", err)
+		} else {
+			log.Printf("[ProxyHandler] Reloaded pool after bulk add (total: %d)", h.pg.PoolSize())
+		}
 	}
 
 	RenderJSON(w, http.StatusCreated, map[string]interface{}{

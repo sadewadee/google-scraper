@@ -99,3 +99,4 @@ bin/
 
 # Temporary test files
 testdata/*.db
+gmaps-scraper-rod
