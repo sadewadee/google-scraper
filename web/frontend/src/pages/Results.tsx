@@ -19,7 +19,8 @@ import {
   Chip,
   IconButton,
   Link,
-  CircularProgress
+  CircularProgress,
+  Drawer
 } from "@mui/material"
 import {
   Search as SearchIcon,
@@ -35,12 +36,14 @@ import {
 import { StatCard } from "../components/StatCard"
 import type { ResultEntry } from "../api/types"
 import { ExportDialog } from "../components/Results/ExportDialog"
+import { BusinessDetail } from "../components/Results/BusinessDetail"
 
 export default function Results() {
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(50)
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
+  const [selectedBusiness, setSelectedBusiness] = useState<ResultEntry | null>(null)
 
   // Fetch all results globally
   const { data: resultsData, isLoading } = useQuery({
@@ -208,22 +211,26 @@ export default function Results() {
                 filteredResults.map((entry, idx) => (
                   <TableRow key={entry.place_id || entry.cid || idx} hover>
                     <TableCell>
-                      {entry.link ? (
-                        <Link
-                          href={entry.link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          underline="hover"
-                          sx={{ fontWeight: 600, maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', color: 'inherit' }}
-                          title={entry.title}
-                        >
-                          {entry.title}
-                        </Link>
-                      ) : (
-                        <Typography sx={{ fontWeight: 600, maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={entry.title}>
-                          {entry.title}
-                        </Typography>
-                      )}
+                      <Link
+                        component="button"
+                        variant="body2"
+                        onClick={() => setSelectedBusiness(entry)}
+                        underline="hover"
+                        sx={{
+                          fontWeight: 600,
+                          maxWidth: 200,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          display: 'block',
+                          color: 'inherit',
+                          textAlign: 'left',
+                          cursor: 'pointer'
+                        }}
+                        title={`View details for ${entry.title}`}
+                      >
+                        {entry.title}
+                      </Link>
                     </TableCell>
                     <TableCell>
                       <Chip
@@ -316,6 +323,30 @@ export default function Results() {
         onExport={handleExport}
         totalResults={total}
       />
+
+      {/* Business Detail Drawer */}
+      <Drawer
+        anchor="right"
+        open={!!selectedBusiness}
+        onClose={() => setSelectedBusiness(null)}
+        PaperProps={{
+          sx: { width: { xs: '100%', sm: 600 }, p: 0 }
+        }}
+      >
+        {selectedBusiness && (
+          <>
+            <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography sx={{ fontWeight: 600, fontSize: '1.125rem' }}>Business Details</Typography>
+              <IconButton onClick={() => setSelectedBusiness(null)} size="small">
+                <CloseOutlined />
+              </IconButton>
+            </Box>
+            <Box sx={{ p: 3, overflowY: 'auto' }}>
+              <BusinessDetail data={selectedBusiness} />
+            </Box>
+          </>
+        )}
+      </Drawer>
     </Box>
   )
 }
